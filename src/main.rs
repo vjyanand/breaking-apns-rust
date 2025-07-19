@@ -6,31 +6,45 @@ use hyper_util::client::legacy::{Client as LegacyClient, connect::HttpConnector}
 use hyper_util::rt::TokioExecutor;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use sqlx::{PgPool, Pool, Postgres};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{Mutex, broadcast, mpsc};
 use tokio::task::JoinSet;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ApnsPayload {
     pub aps: ApsPayload,
     #[serde(flatten)]
-    pub custom: HashMap<String, serde_json::Value>,
+    pub custom: Map<String, Value>,
 }
 
 impl ApnsPayload {
-    pub fn custom<T: Into<serde_json::Value>>(mut self, key: &str, value: T) -> Self {
-        self.custom.insert(key.to_string(), value.into());
+    pub fn new(aps: ApsPayload) -> Self {
+        Self {
+            aps,
+            custom: Map::new(),
+        }
+    }
+
+    /// Add a custom field with any serializable value
+    pub fn with_custom<T: Into<Value>>(mut self, key: impl Into<String>, value: T) -> Self {
+        self.custom.insert(key.into(), value.into());
         self
+    }
+    /// Get the payload size in bytes
+    pub fn size2(&self) -> Result<usize, serde_json::Error> {
+        let json = serde_json::to_string(self)?;
+        Ok(json.len())
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ApsPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alert: Option<AlertPayload>,
@@ -42,13 +56,154 @@ pub struct ApsPayload {
     pub content_available: Option<i32>,
     #[serde(rename = "mutable-content", skip_serializing_if = "Option::is_none")]
     pub mutable_content: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+impl Default for ApsPayload {
+    fn default() -> Self {
+        Self {
+            alert: None,
+            badge: None,
+            sound: None,
+            content_available: None,
+            mutable_content: None,
+            category: None
+        }
+    }
+}
+
+impl ApsPayload {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_alert(mut self, alert: AlertPayload) -> Self {
+        self.alert = Some(alert);
+        self
+    }
+
+    pub fn with_badge(mut self, badge: i32) -> Self {
+        self.badge = Some(badge);
+        self
+    }
+
+    pub fn with_sound<S: Into<String>>(mut self, sound: S) -> Self {
+        self.sound = Some(sound.into());
+        self
+    }
+
+    pub fn with_content_available(mut self) -> Self {
+        self.content_available = Some(1);
+        self
+    }
+
+    pub fn with_mutable_content(mut self) -> Self {
+        self.mutable_content = Some(1);
+        self
+    }
+
+    pub fn with_category<S: Into<String>>(mut self, category: S) -> Self {
+        self.category = Some(category.into());
+        self
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AlertPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subtitle: Option<String>,
     pub body: String,
+    
+}
+
+impl AlertPayload {
+    pub fn new<S: Into<String>>(body: S) -> Self {
+        Self {
+            title: None,
+            subtitle: None,
+            body: body.into(),
+        }
+    }
+
+    pub fn with_title<S: Into<String>>(mut self, title: S) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    pub fn with_subtitle<S: Into<String>>(mut self, subtitle: S) -> Self {
+        self.subtitle = Some(subtitle.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PayloadBuilder {
+    aps: ApsPayload,
+    custom_fields: Map<String, Value>,
+}
+
+impl PayloadBuilder {
+    pub fn new() -> Self {
+        Self {
+            aps: ApsPayload::new(),
+            custom_fields: Map::new(),
+        }
+    }
+
+    pub fn alert<S: Into<String>>(mut self, title: Option<S>, body: S) -> Self {
+        let mut alert = AlertPayload::new(body);
+        if let Some(t) = title {
+            alert = alert.with_title(t);
+        }
+        self.aps = self.aps.with_alert(alert);
+        self
+    }
+
+    pub fn badge(mut self, badge: i32) -> Self {
+        self.aps = self.aps.with_badge(badge);
+        self
+    }
+
+    pub fn sound<S: Into<String>>(mut self, sound: S) -> Self {
+        self.aps = self.aps.with_sound(sound);
+        self
+    }
+
+    pub fn content_available(mut self) -> Self {
+        self.aps = self.aps.with_content_available();
+        self
+    }
+
+    pub fn mutable_content(mut self) -> Self {
+        self.aps = self.aps.with_mutable_content();
+        self
+    }
+
+    pub fn category<S: Into<String>>(mut self, category: S) -> Self {
+        self.aps = self.aps.with_category(category);
+        self
+    }
+
+    pub fn custom<T: Into<Value>>(mut self, key: impl Into<String>, value: T) -> Self {
+        self.custom_fields.insert(key.into(), value.into());
+        self
+    }
+
+    pub fn build(self) -> ApnsPayload {
+        ApnsPayload {
+            aps: self.aps,
+            custom: self.custom_fields,
+        }
+    }
+}
+
+impl Default for PayloadBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct PushNotification {
@@ -60,6 +215,41 @@ pub struct PushNotification {
     pub push_type: Option<String>,
     pub title: Option<String>,
     pub payload: ApnsPayload,
+}
+
+impl PushNotification {
+    pub fn new(id: i64, device_token: String, payload: ApnsPayload) -> Self {
+        Self {
+            id,
+            device_token,
+            priority: None,
+            expiration: None,
+            collapse_id: None,
+            push_type: None,
+            title: None,
+            payload,
+        }
+    }
+
+    pub fn with_priority(mut self, priority: i32) -> Self {
+        self.priority = Some(priority);
+        self
+    }
+
+    pub fn with_expiration(mut self, expiration: u64) -> Self {
+        self.expiration = Some(expiration);
+        self
+    }
+
+    pub fn with_collapse_id<S: Into<String>>(mut self, collapse_id: S) -> Self {
+        self.collapse_id = Some(collapse_id.into());
+        self
+    }
+
+    pub fn with_push_type<S: Into<String>>(mut self, push_type: S) -> Self {
+        self.push_type = Some(push_type.into());
+        self
+    }
 }
 
 pub struct PushResult {
@@ -76,12 +266,12 @@ pub struct ApnsConfig {
     pub key_id: String,
     pub team_id: String,
     pub topic: String,
-    pub private_key: String, // P8 file content
+    pub private_key: String,
     pub sandbox: bool,
 }
 
 impl ApnsConfig {
-    pub fn generate_jwt(&self) -> Result<String, Box<dyn std::error::Error>> {
+    pub fn generate_jwt(&self) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         #[derive(Serialize)]
         struct Claims {
             iss: String,
@@ -103,19 +293,20 @@ impl ApnsConfig {
         Ok(token)
     }
 }
+
 #[derive(Debug, Clone)]
 pub struct ApnsClient {
     client: LegacyClient<HttpsConnector<HttpConnector>, Full<Bytes>>,
     config: ApnsConfig,
     base_url: String,
-    jwt_cache: String,
+    jwt_token: String,
 }
 
 impl ApnsClient {
     pub fn new(config: ApnsConfig) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let https_connector = HttpsConnector::new();
         let client = LegacyClient::builder(TokioExecutor::new())
-            .pool_idle_timeout(std::time::Duration::from_secs(30))
+            .pool_idle_timeout(Duration::from_secs(30))
             .pool_max_idle_per_host(100)
             .http2_only(true)
             .build(https_connector);
@@ -125,13 +316,14 @@ impl ApnsClient {
         } else {
             "https://api.push.apple.com".to_string()
         };
-        let jwt_token = config.generate_jwt().unwrap();
+
+        let jwt_token = config.generate_jwt()?;
 
         Ok(Self {
             client,
             config,
             base_url,
-            jwt_cache: jwt_token,
+            jwt_token,
         })
     }
 
@@ -146,7 +338,7 @@ impl ApnsClient {
         let mut request = Request::builder()
             .method(Method::POST)
             .uri(uri)
-            .header("authorization", format!("bearer {}", &self.jwt_cache))
+            .header("authorization", format!("bearer {}", &self.jwt_token))
             .header("content-type", "application/json")
             .header("content-length", payload.len().to_string())
             .header("apns-topic", &self.config.topic);
@@ -202,7 +394,6 @@ impl ApnsClient {
             },
         };
 
-        // Only log failures
         if !result.success {
             eprintln!(
                 "APNs Failure: ID={}, Token={}, Status={}, Error={:?}",
@@ -216,10 +407,6 @@ impl ApnsClient {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // let database_url = std::env::var("DATABASE_URL")
-    //    .unwrap_or_else(|_| "postgres://breaking:qwertY123@db.iavian.net/breaking".to_string());
-    // let pool = PgPool::connect(&database_url).await?;
-
     let config = ApnsConfig {
         key_id: "9F437T6Y4G".to_string(),
         team_id: "JX83D66C47".to_string(),
@@ -227,35 +414,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         private_key: std::fs::read_to_string("key.p8")?,
         sandbox: false,
     };
+
     let client = ApnsClient::new(config)?;
 
-    let notification = PushNotification {
-        id: 1,
-        device_token: "4ffc5df2e74ea8e308caffffd22248aa2db666cd2ce64d474b118a935d105ce8"
-            .to_string(),
-        payload: ApnsPayload {
-            aps: ApsPayload {
-                alert: Some(AlertPayload {
-                    title: Some("Breaking Newss".to_string()),
-                    body: "A new article has been published.".to_string(),
-                }),
-                badge: Some(1),
-                sound: Some("default".to_string()),
-                content_available: None,
-                mutable_content: None,
-            },
-            custom: HashMap::new(),
-        }
-        .custom("_u", "https://iavian.com")
-        .custom("s", "CNN")
-        .custom("nid", "1"),
-        priority: Some(10),
-        push_type: Some("alert".to_string()),
-        expiration: None,
-        title: Some("Test Notification".to_string()),
-        collapse_id: format!("collapse_{}", 1).into(),
-    };
+    // Example 1: Using PayloadBuilder (Recommended)
+    let payload = PayloadBuilder::new()
+        .alert(Some("Breaking News"), "A new article has been published.")
+        .badge(1)
+        .sound("default")
+        .custom("category", "news")
+        .custom("priority", "high")
+        .build();
 
-    client.send_notification(notification).await?;
+    
+    let notification = PushNotification::new(
+        1,
+        "4ffc5df2e74ea8e308caffffd22248aa2db666cd2ce64d474b118a935d105ce8".to_string(),
+        payload,
+    )
+    .with_priority(10)
+    .with_push_type("alert")
+    .with_collapse_id(format!("collapse_{}", 1));
+
+    let result = client.send_notification(notification).await?;
+
+    if result.success {
+        println!(
+            "Notification sent successfully! APNs ID: {:?}",
+            result.apns_id
+        );
+    } else {
+        println!("Failed to send notification: {:?}", result.error);
+    }
+
     Ok(())
 }
