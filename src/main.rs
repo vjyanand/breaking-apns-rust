@@ -23,10 +23,17 @@ pub struct ApnsPayload {
     pub custom: HashMap<String, serde_json::Value>,
 }
 
+impl ApnsPayload {
+    pub fn custom<T: Into<serde_json::Value>>(mut self, key: &str, value: T) -> Self {
+        self.custom.insert(key.to_string(), value.into());
+        self
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApsPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub alert: Option<serde_json::Value>,
+    pub alert: Option<AlertPayload>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub badge: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -35,6 +42,13 @@ pub struct ApsPayload {
     pub content_available: Option<i32>,
     #[serde(rename = "mutable-content", skip_serializing_if = "Option::is_none")]
     pub mutable_content: Option<i32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AlertPayload {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    pub body: String,
 }
 
 pub struct PushNotification {
@@ -221,17 +235,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .to_string(),
         payload: ApnsPayload {
             aps: ApsPayload {
-                alert: Some(serde_json::json!({
-                    "title": "Test Notification",
-                    "body": format!("Message {}", 1)
-                })),
+                alert: Some(AlertPayload {
+                    title: Some("Breaking Newss".to_string()),
+                    body: "A new article has been published.".to_string(),
+                }),
                 badge: Some(1),
                 sound: Some("default".to_string()),
                 content_available: None,
                 mutable_content: None,
             },
             custom: HashMap::new(),
-        },
+        }
+        .custom("_u", "https://iavian.com")
+        .custom("s", "CNN")
+        .custom("nid", "1"),
         priority: Some(10),
         push_type: Some("alert".to_string()),
         expiration: None,
