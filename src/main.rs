@@ -37,11 +37,7 @@ impl ApnsPayload {
         self.custom.insert(key.into(), value.into());
         self
     }
-    /// Get the payload size in bytes
-    pub fn size2(&self) -> Result<usize, serde_json::Error> {
-        let json = serde_json::to_string(self)?;
-        Ok(json.len())
-    }
+    
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
