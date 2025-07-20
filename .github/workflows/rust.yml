@@ -21,6 +21,6 @@ jobs:
       run: |
         apk add --no-cache cargo rust openssl-dev
     - name: Build
-      run: cargo build --verbose --release
+      run: cargo build --release
     - name: Run tests
       run: cargo test --verbose
