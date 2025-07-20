@@ -7,8 +7,8 @@ use hyper_util::rt::TokioExecutor;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use sqlx::Row;
 use sqlx::{FromRow, PgPool, Pool, Postgres};
+use sqlx::{Row, Type};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -201,8 +201,9 @@ impl Default for PayloadBuilder {
     }
 }
 
+#[derive(Debug)]
 pub struct PushNotification {
-    pub id: i64,
+    pub id: Uuid,
     pub device_token: String,
     pub priority: Option<i32>,
     pub expiration: Option<u64>,
@@ -213,7 +214,7 @@ pub struct PushNotification {
 }
 
 impl PushNotification {
-    pub fn new(id: i64, device_token: String, payload: ApnsPayload) -> Self {
+    pub fn new(id: Uuid, device_token: String, payload: ApnsPayload) -> Self {
         Self {
             id,
             device_token,
@@ -247,17 +248,51 @@ impl PushNotification {
     }
 }
 
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[sqlx(type_name = "breaking_apns_type", rename_all = "SCREAMING_SNAKE_CASE")]
+enum BreakingApnsType {
+    App,
+    Watch,
+    Complication,
+}
+struct Sound(String);
+impl From<i16> for Sound {
+    fn from(sound_id: i16) -> Self {
+        let sound = match sound_id {
+            0 => "",
+            1 => "default",
+            2 => "g.caf",
+            3 => "p.caf",
+            4 => "s.caf",
+            5 => "gl.caf",
+            6 => "sm.caf",
+            7 => "w.caf",
+            _ => "default",
+        };
+        Sound(sound.to_string())
+    }
+}
+
 impl FromRow<'_, sqlx::postgres::PgRow> for PushNotification {
     fn from_row(row: &sqlx::postgres::PgRow) -> Result<Self, sqlx::Error> {
+        let paid: bool = row.try_get("paid")?;
+        let playsound: bool = row.try_get("playsound")?;
+        let sound_id: i16 = row.try_get("sound_id")?;
+        let sound: Option<String> = if playsound {
+            Some(Sound::from(sound_id).0)
+        } else {
+            None
+        };
+        let push_type: BreakingApnsType = row.try_get("type")?;
         let alert = AlertPayload {
-            title: Some("".to_string()),
+            title: Some("title".to_string()),
             subtitle: None,
-            body: row.try_get("body")?,
+            body: row.try_get("text")?,
         };
         let aps: ApsPayload = ApsPayload {
             alert: Some(alert),
             badge: None,
-            sound: None,
+            sound,
             content_available: None,
             mutable_content: None,
             category: None,
@@ -268,20 +303,19 @@ impl FromRow<'_, sqlx::postgres::PgRow> for PushNotification {
         };
         Ok(Self {
             id: row.try_get("id")?,
-            device_token: row.try_get("device_token")?,
-            priority: row.try_get("priority").ok(),
-            expiration: Some(1),
-            collapse_id: row.try_get("collapse_id").ok(),
-            push_type: row.try_get("push_type").ok(),
-            title: row.try_get("title").ok(),
+            device_token: row.try_get("token")?,
+            priority: Some(10),
+            expiration: None,
+            collapse_id: Some("1".to_owned()),
+            push_type: Some("alert".to_owned()),
+            title: Some("alert1".to_owned()),
             payload,
         })
     }
 }
 
 pub struct PushResult {
-    pub notification_id: i64,
-    pub device_token: String,
+    pub notification_id: Uuid,
     pub success: bool,
     pub status_code: u16,
     pub apns_id: Option<String>,
@@ -361,7 +395,7 @@ impl ApnsClient {
         let url = format!("{}/3/device/{}", self.base_url, notification.device_token);
         let uri: Uri = url.parse()?;
         let payload = serde_json::to_string(&notification.payload)?;
-
+        println!("APNs Payload: {}", payload);
         let mut request = Request::builder()
             .method(Method::POST)
             .uri(uri)
@@ -386,8 +420,7 @@ impl ApnsClient {
             request = request.header("apns-push-type", push_type);
         }
 
-        let apns_id = Uuid::new_v4().to_string();
-        request = request.header("apns-id", &apns_id);
+        request = request.header("apns-id", &notification.id.to_string());
 
         let request = request.body(Full::new(Bytes::from(payload)))?;
 
@@ -399,7 +432,7 @@ impl ApnsClient {
             .get("apns-id")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string())
-            .unwrap_or(apns_id);
+            .unwrap_or(notification.id.to_string());
 
         let body_bytes = response.collect().await?.to_bytes();
         let error_message = if !status.is_success() && !body_bytes.is_empty() {
@@ -410,7 +443,6 @@ impl ApnsClient {
 
         let result = PushResult {
             notification_id: notification.id,
-            device_token: notification.device_token,
             success: status.is_success(),
             status_code: status.as_u16(),
             apns_id: Some(apns_id_header),
@@ -423,8 +455,8 @@ impl ApnsClient {
 
         if !result.success {
             eprintln!(
-                "APNs Failure: ID={}, Token={}, Status={}, Error={:?}",
-                result.notification_id, result.device_token, result.status_code, result.error
+                "APNs Failure: ID={}, Status={}, Error={:?}",
+                result.notification_id, result.status_code, result.error
             );
         }
 
@@ -452,18 +484,41 @@ impl ApnsProcessor {
     ) {
         let mut device_hash_filter = String::new();
         if let Some(device_hash) = device_hash {
-            device_hash_filter = format!("dm.devicehash = '{}' and", device_hash);
+            device_hash_filter = format!("dm.devicehash = '{}' AND", device_hash);
         }
         let sql = format!(
-            "SELECT nm.url, dm.id, nm.id AS nId, dm.devicehash, dm.token, dm.sound_id, trim(nm.text) AS text, (case when _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' then ((_from, _to) OVERLAPS (current_time, current_time)) else (case when _from <= current_time OR _to >= current_time then true else false end) end) AS playsound, dm.paid, extract(epoch from nm.news_date) AS news_date, dm.type, nm.news_id FROM apns_master dm, news_master nm where %s (dm.news_id & nm.news_id = nm.news_id) %s AND {} nm.id = $1",
+            "SELECT nm.url, dm.id, nm.id AS nId, dm.devicehash, dm.token, dm.sound_id, trim(nm.text) AS text, (case when _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' then ((_from, _to) OVERLAPS (current_time, current_time)) else (case when _from <= current_time OR _to >= current_time then true else false end) end) AS playsound, dm.paid, extract(epoch from nm.news_date) AS news_date, dm.type, nm.news_id FROM apns_master dm, news_master nm where (dm.news_id & nm.news_id = nm.news_id) AND {} nm.id = $1",
             device_hash_filter
         );
 
-        println!("SQL Query: {}", sql);
+       // println!("SQL Query: {}", sql);
 
         let mut stream = sqlx::query_as::<_, PushNotification>(&sql)
             .bind(news_id)
             .fetch(&pool);
+        while let Some(notification) = stream.next().await {
+            match notification {
+                Ok(notification) => {
+                    println!(
+                        "Processing notification: ID={}, DeviceToken={}",
+                        notification.id, notification.device_token
+                    );
+                    let result = self.client.send_notification(notification).await;
+                    println!(
+                        "Notification result: ID={}, Success={}",
+                        result
+                            .as_ref()
+                            .map(|r| r.notification_id)
+                            .unwrap_or_default(),
+                        result.as_ref().map(|r| r.success).unwrap_or(false)
+                    );
+                }
+                Err(err) => {
+                    eprintln!("Error fetching notification: {}", err);
+                    continue;
+                }
+            }
+        }
     }
 }
 #[tokio::main]
@@ -477,35 +532,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     };
 
     let client = ApnsClient::new(config)?;
+    let processor = ApnsProcessor::new(client, 10);
+    // Connect to Postgres
+    let pool =
+        Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await?;
 
-    // Example 1: Using PayloadBuilder (Recommended)
-    let payload = PayloadBuilder::new()
-        .alert(Some("Breaking News"), "A new article has been published.")
-        .badge(1)
-        .sound("default")
-        .custom("category", "news")
-        .custom("priority", "high")
-        .build();
+    let device_hash =
+        Some("4ffc5df2e74ea8e308caffffd22248aa2db666cd2ce64d474b118a935d105ce8".to_owned());
 
-    let notification = PushNotification::new(
-        1,
-        "4ffc5df2e74ea8e308caffffd22248aa2db666cd2ce64d474b118a935d105ce8".to_string(),
-        payload,
-    )
-    .with_priority(10)
-    .with_push_type("alert")
-    .with_collapse_id(format!("collapse_{}", 1));
+    let device_hash = Some("B3C1E811-AF76-4E98-BED0-5F7D63B034B9".to_owned());
 
-    let result = client.send_notification(notification).await?;
-
-    if result.success {
-        println!(
-            "Notification sent successfully! APNs ID: {:?}",
-            result.apns_id
-        );
-    } else {
-        println!("Failed to send notification: {:?}", result.error);
-    }
+    processor
+        .process_notifications(pool, 402001, device_hash)
+        .await;
 
     Ok(())
 }
