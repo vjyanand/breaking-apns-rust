@@ -7,7 +7,8 @@ use hyper_util::rt::TokioExecutor;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use sqlx::{PgPool, Pool, Postgres};
+use sqlx::Row;
+use sqlx::{FromRow, PgPool, Pool, Postgres};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -37,7 +38,6 @@ impl ApnsPayload {
         self.custom.insert(key.into(), value.into());
         self
     }
-    
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -64,7 +64,7 @@ impl Default for ApsPayload {
             sound: None,
             content_available: None,
             mutable_content: None,
-            category: None
+            category: None,
         }
     }
 }
@@ -112,7 +112,6 @@ pub struct AlertPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subtitle: Option<String>,
     pub body: String,
-    
 }
 
 impl AlertPayload {
@@ -245,6 +244,38 @@ impl PushNotification {
     pub fn with_push_type<S: Into<String>>(mut self, push_type: S) -> Self {
         self.push_type = Some(push_type.into());
         self
+    }
+}
+
+impl FromRow<'_, sqlx::postgres::PgRow> for PushNotification {
+    fn from_row(row: &sqlx::postgres::PgRow) -> Result<Self, sqlx::Error> {
+        let alert = AlertPayload {
+            title: Some("".to_string()),
+            subtitle: None,
+            body: row.try_get("body")?,
+        };
+        let aps: ApsPayload = ApsPayload {
+            alert: Some(alert),
+            badge: None,
+            sound: None,
+            content_available: None,
+            mutable_content: None,
+            category: None,
+        };
+        let payload: ApnsPayload = ApnsPayload {
+            aps,
+            custom: Map::new(),
+        };
+        Ok(Self {
+            id: row.try_get("id")?,
+            device_token: row.try_get("device_token")?,
+            priority: row.try_get("priority").ok(),
+            expiration: Some(1),
+            collapse_id: row.try_get("collapse_id").ok(),
+            push_type: row.try_get("push_type").ok(),
+            title: row.try_get("title").ok(),
+            payload,
+        })
     }
 }
 
@@ -401,6 +432,40 @@ impl ApnsClient {
     }
 }
 
+pub struct ApnsProcessor {
+    client: ApnsClient,
+    worker_count: usize,
+}
+
+impl ApnsProcessor {
+    pub fn new(client: ApnsClient, worker_count: usize) -> Self {
+        Self {
+            client,
+            worker_count,
+        }
+    }
+    pub async fn process_notifications(
+        &self,
+        pool: Pool<Postgres>,
+        news_id: i64,
+        device_hash: Option<String>,
+    ) {
+        let mut device_hash_filter = String::new();
+        if let Some(device_hash) = device_hash {
+            device_hash_filter = format!("dm.devicehash = '{}' and", device_hash);
+        }
+        let sql = format!(
+            "SELECT nm.url, dm.id, nm.id AS nId, dm.devicehash, dm.token, dm.sound_id, trim(nm.text) AS text, (case when _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' then ((_from, _to) OVERLAPS (current_time, current_time)) else (case when _from <= current_time OR _to >= current_time then true else false end) end) AS playsound, dm.paid, extract(epoch from nm.news_date) AS news_date, dm.type, nm.news_id FROM apns_master dm, news_master nm where %s (dm.news_id & nm.news_id = nm.news_id) %s AND {} nm.id = $1",
+            device_hash_filter
+        );
+
+        println!("SQL Query: {}", sql);
+
+        let mut stream = sqlx::query_as::<_, PushNotification>(&sql)
+            .bind(news_id)
+            .fetch(&pool);
+    }
+}
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = ApnsConfig {
@@ -422,7 +487,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .custom("priority", "high")
         .build();
 
-    
     let notification = PushNotification::new(
         1,
         "4ffc5df2e74ea8e308caffffd22248aa2db666cd2ce64d474b118a935d105ce8".to_string(),
