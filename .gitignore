@@ -1,1 +1,5 @@
 /target
+Cargo.lock
+.gitignore
+template
+key.p8
