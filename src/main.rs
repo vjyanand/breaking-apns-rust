@@ -7,15 +7,13 @@ use hyper_util::rt::TokioExecutor;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use sqlx::{FromRow, PgPool, Pool, Postgres};
+use sqlx::{FromRow, Pool, Postgres};
 use sqlx::{Row, Type};
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::sync::{Mutex, broadcast, mpsc};
+use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 use tokio_stream::StreamExt;
-use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -209,7 +207,6 @@ pub struct PushNotification {
     pub expiration: Option<u64>,
     pub collapse_id: Option<String>,
     pub push_type: Option<String>,
-    pub title: Option<String>,
     pub payload: ApnsPayload,
 }
 
@@ -222,7 +219,6 @@ impl PushNotification {
             expiration: None,
             collapse_id: None,
             push_type: None,
-            title: None,
             payload,
         }
     }
@@ -285,8 +281,8 @@ impl FromRow<'_, sqlx::postgres::PgRow> for PushNotification {
         };
         let push_type: BreakingApnsType = row.try_get("type")?;
         let alert = AlertPayload {
-            title: Some("title".to_string()),
-            subtitle: None,
+            title: None,
+            subtitle: Some("stitle".to_string()),
             body: row.try_get("text")?,
         };
         let aps: ApsPayload = ApsPayload {
@@ -308,12 +304,13 @@ impl FromRow<'_, sqlx::postgres::PgRow> for PushNotification {
             expiration: None,
             collapse_id: Some("1".to_owned()),
             push_type: Some("alert".to_owned()),
-            title: Some("alert1".to_owned()),
+
             payload,
         })
     }
 }
 
+#[derive(Debug)]
 pub struct PushResult {
     pub notification_id: Uuid,
     pub success: bool,
@@ -482,6 +479,8 @@ impl ApnsProcessor {
         news_id: i64,
         device_hash: Option<String>,
     ) {
+        let (tx, rx) = mpsc::channel(1000);
+
         let mut device_hash_filter = String::new();
         if let Some(device_hash) = device_hash {
             device_hash_filter = format!("dm.devicehash = '{}' AND", device_hash);
@@ -491,32 +490,58 @@ impl ApnsProcessor {
             device_hash_filter
         );
 
-       // println!("SQL Query: {}", sql);
+        // println!("SQL Query: {}", sql);
+        let fetch_task = tokio::spawn(async move {
+            let mut stream = sqlx::query_as::<_, PushNotification>(&sql)
+                .bind(news_id)
+                .fetch(&pool);
+            while let Some(notification) = stream.next().await {
+                match notification {
+                    Ok(notification) => {
+                        println!(
+                            "Processing notification: ID={}, DeviceToken={}",
+                            notification.id, notification.device_token
+                        );
+                        if tx.send(notification).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!("Error fetching notification: {}", err);
+                        continue;
+                    }
+                }
+            }
+            drop(tx);
+        });
 
-        let mut stream = sqlx::query_as::<_, PushNotification>(&sql)
-            .bind(news_id)
-            .fetch(&pool);
-        while let Some(notification) = stream.next().await {
-            match notification {
-                Ok(notification) => {
-                    println!(
-                        "Processing notification: ID={}, DeviceToken={}",
-                        notification.id, notification.device_token
-                    );
-                    let result = self.client.send_notification(notification).await;
-                    println!(
-                        "Notification result: ID={}, Success={}",
-                        result
-                            .as_ref()
-                            .map(|r| r.notification_id)
-                            .unwrap_or_default(),
-                        result.as_ref().map(|r| r.success).unwrap_or(false)
-                    );
+        let shared_rx = Arc::new(tokio::sync::Mutex::new(rx));
+        let mut join_set = JoinSet::new();
+        for _ in 0..self.worker_count {
+            let worker_rx = Arc::clone(&shared_rx);
+            let client = self.client.clone();
+            join_set.spawn(async move {
+                loop {
+                    let notification = {
+                        let mut rx_guard = worker_rx.lock().await;
+                        rx_guard.recv().await
+                    };
+                    match notification {
+                        Some(notif) => {
+                            let result = client.send_notification(notif).await;
+                            println!("{:?}", result);
+                        }
+                        None => break, // Channel closed
+                    }
                 }
-                Err(err) => {
-                    eprintln!("Error fetching notification: {}", err);
-                    continue;
-                }
+            });
+        }
+
+        let _ = fetch_task.await;
+        while let Some(result) = join_set.join_next().await {
+            match result {
+                Ok(_) => println!("Worker completed successfully"),
+                Err(e) => eprintln!("Worker task panicked: {}", e),
             }
         }
     }
@@ -536,9 +561,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Connect to Postgres
     let pool =
         Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await?;
-
-    let device_hash =
-        Some("4ffc5df2e74ea8e308caffffd22248aa2db666cd2ce64d474b118a935d105ce8".to_owned());
 
     let device_hash = Some("B3C1E811-AF76-4E98-BED0-5F7D63B034B9".to_owned());
 
