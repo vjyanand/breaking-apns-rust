@@ -48,10 +48,6 @@ pub struct ApsPayload {
     pub sound: Option<String>,
     #[serde(rename = "content-available", skip_serializing_if = "Option::is_none")]
     pub content_available: Option<i32>,
-    #[serde(rename = "mutable-content", skip_serializing_if = "Option::is_none")]
-    pub mutable_content: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub category: Option<String>,
 }
 
 impl Default for ApsPayload {
@@ -61,8 +57,6 @@ impl Default for ApsPayload {
             badge: None,
             sound: None,
             content_available: None,
-            mutable_content: None,
-            category: None,
         }
     }
 }
@@ -89,16 +83,6 @@ impl ApsPayload {
 
     pub fn with_content_available(mut self) -> Self {
         self.content_available = Some(1);
-        self
-    }
-
-    pub fn with_mutable_content(mut self) -> Self {
-        self.mutable_content = Some(1);
-        self
-    }
-
-    pub fn with_category<S: Into<String>>(mut self, category: S) -> Self {
-        self.category = Some(category.into());
         self
     }
 }
@@ -170,16 +154,6 @@ impl PayloadBuilder {
         self
     }
 
-    pub fn mutable_content(mut self) -> Self {
-        self.aps = self.aps.with_mutable_content();
-        self
-    }
-
-    pub fn category<S: Into<String>>(mut self, category: S) -> Self {
-        self.aps = self.aps.with_category(category);
-        self
-    }
-
     pub fn custom<T: Into<Value>>(mut self, key: impl Into<String>, value: T) -> Self {
         self.custom_fields.insert(key.into(), value.into());
         self
@@ -206,7 +180,7 @@ pub struct PushNotification {
     pub priority: Option<i32>,
     pub expiration: Option<u64>,
     pub collapse_id: Option<String>,
-    pub push_type: Option<String>,
+    pub push_type: BreakingApnsType,
     pub payload: ApnsPayload,
 }
 
@@ -218,7 +192,7 @@ impl PushNotification {
             priority: None,
             expiration: None,
             collapse_id: None,
-            push_type: None,
+            push_type: BreakingApnsType::App,
             payload,
         }
     }
@@ -237,16 +211,11 @@ impl PushNotification {
         self.collapse_id = Some(collapse_id.into());
         self
     }
-
-    pub fn with_push_type<S: Into<String>>(mut self, push_type: S) -> Self {
-        self.push_type = Some(push_type.into());
-        self
-    }
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[sqlx(type_name = "breaking_apns_type", rename_all = "SCREAMING_SNAKE_CASE")]
-enum BreakingApnsType {
+pub enum BreakingApnsType {
     App,
     Watch,
     Complication,
@@ -290,8 +259,6 @@ impl FromRow<'_, sqlx::postgres::PgRow> for PushNotification {
             badge: None,
             sound,
             content_available: None,
-            mutable_content: None,
-            category: None,
         };
         let payload: ApnsPayload = ApnsPayload {
             aps,
@@ -303,8 +270,7 @@ impl FromRow<'_, sqlx::postgres::PgRow> for PushNotification {
             priority: Some(10),
             expiration: None,
             collapse_id: Some("1".to_owned()),
-            push_type: Some("alert".to_owned()),
-
+            push_type,
             payload,
         })
     }
@@ -411,10 +377,6 @@ impl ApnsClient {
 
         if let Some(collapse_id) = &notification.collapse_id {
             request = request.header("apns-collapse-id", collapse_id);
-        }
-
-        if let Some(push_type) = &notification.push_type {
-            request = request.header("apns-push-type", push_type);
         }
 
         request = request.header("apns-id", &notification.id.to_string());
