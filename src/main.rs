@@ -1,16 +1,29 @@
 mod apns;
 mod client;
 mod config;
+mod handler;
 mod processor;
+use std::env;
 
-use sqlx::{Pool, Postgres};
+use actix_web::middleware::{self, Logger};
+use actix_web::web::Data;
+use actix_web::{App, HttpServer};
+use log::debug;
 
-use crate::client::ApnsClient;
 use crate::config::ApnsConfig;
-use crate::processor::ApnsProcessor;
-
+use crate::handler::ok;
+use crate::handler::push;
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() -> std::io::Result<()> {
+    env_logger::init();
+    debug!("Debug mode enabled");
+
+    let port: u16 = env::var("PORT")
+        .unwrap_or_else(|_| String::from("9090"))
+        .parse()
+        .expect("PORT must be a number");
+
+    let binding_interface = format!("0.0.0.0:{port}");
     let config = ApnsConfig {
         key_id: "9F437T6Y4G".to_string(),
         team_id: "JX83D66C47".to_string(),
@@ -18,17 +31,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         sandbox: false,
     };
 
-    let client = ApnsClient::new(config)?;
-    let processor = ApnsProcessor::new(client, 10);
-    // Connect to Postgres
-    let pool =
-        Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await?;
-
-    let device_hash = Some("B3C1E811-AF76-4E98-BED0-5F7D63B034B9".to_owned());
-
-    processor
-        .process_notifications(pool, 402028, device_hash)
-        .await;
-
-    Ok(())
+    HttpServer::new(move || {
+        App::new()
+            .app_data(Data::new(config.clone()))
+            .wrap(Logger::default())
+            .wrap(middleware::DefaultHeaders::new().add(("X-Version", env!("CARGO_PKG_VERSION"))))
+            .service(ok)
+            .service(push)
+    })
+    .bind(binding_interface)?
+    .run()
+    .await
 }

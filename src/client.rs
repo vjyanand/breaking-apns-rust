@@ -20,7 +20,7 @@ pub struct ApnsClient {
 }
 
 impl ApnsClient {
-    pub fn new(config: ApnsConfig) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn new(config: &ApnsConfig) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let https_connector = HttpsConnector::new();
         let client = LegacyClient::builder(TokioExecutor::new())
             .pool_idle_timeout(Duration::from_secs(30))
