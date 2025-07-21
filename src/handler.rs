@@ -45,7 +45,7 @@ pub async fn push(
     HttpResponse::Ok().body("Ok")
 }
 
-#[actix_web::get("/ok")]
+#[actix_web::get("/stats")]
 pub async fn ok() -> impl Responder {
-    HttpResponse::Ok().body("Ok")
+    HttpResponse::Ok().json(vec!["Nice to see the script up and running"])
 }
