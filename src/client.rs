@@ -119,7 +119,12 @@ impl ApnsClient {
                 Some(error_message)
             },
         };
-        if !result.success {
+        if !result.success && result.status_code == 410 {
+            eprintln!(
+                "DB-dELETE-APNs Failure: ID={}, APNS-ID={:?},Status={}, Error={:?}",
+                result.notification_id, result.apns_id, result.status_code, result.error
+            );
+        } else if !result.success {
             eprintln!(
                 "APNs Failure: ID={}, APNS-ID={:?},Status={}, Error={:?}",
                 result.notification_id, result.apns_id, result.status_code, result.error
