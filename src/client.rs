@@ -57,8 +57,7 @@ impl ApnsClient {
             crate::apns::BreakingApnsType::App => "com.iavian.breakingnews",
             crate::apns::BreakingApnsType::Watch => "com.iavian.breakingnews.watchkitapp",
         };
-        println!("{payload}");
-
+        
         let mut request = Request::builder()
             .method(Method::POST)
             .uri(uri)

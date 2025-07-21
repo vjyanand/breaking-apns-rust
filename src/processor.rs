@@ -35,7 +35,7 @@ impl ApnsProcessor {
             "SELECT nm.url, dm.id, nm.id AS nId, dm.devicehash, dm.token, dm.sound_id, trim(nm.text) AS text, (case when _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' then ((_from, _to) OVERLAPS (current_time, current_time)) else (case when _from <= current_time OR _to >= current_time then true else false end) end) AS playsound, dm.paid, extract(epoch from nm.news_date)::BIGINT AS news_date, dm.type, nm.news_id FROM apns_master dm, news_master nm where (dm.news_id & nm.news_id = nm.news_id) AND {device_hash_filter} nm.id = $1"
         );
         println!("SQL Query: {sql}");
-        
+
         let fetch_task = tokio::spawn(async move {
             let mut stream = sqlx::query_as::<_, PushNotification>(&sql)
                 .bind(news_id)
@@ -43,10 +43,6 @@ impl ApnsProcessor {
             while let Some(notification) = stream.next().await {
                 match notification {
                     Ok(notification) => {
-                        println!(
-                            "Processing notification: ID={}, DeviceToken={}",
-                            notification.id, notification.device_token
-                        );
                         if tx.send(notification).await.is_err() {
                             break;
                         }
@@ -73,8 +69,9 @@ impl ApnsProcessor {
                     };
                     match notification {
                         Some(notif) => {
-                            let result = client.send_notification(notif).await;
-                            println!("{result:?}");
+                            if let Err(err) = client.send_notification(notif).await {
+                                eprintln!("Error sending notification: {err}");
+                            }
                         }
                         None => break, // Channel closed
                     }
