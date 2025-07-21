@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let device_hash = Some("B3C1E811-AF76-4E98-BED0-5F7D63B034B9".to_owned());
 
     processor
-        .process_notifications(pool, 402001, device_hash)
+        .process_notifications(pool, 402028, device_hash)
         .await;
 
     Ok(())

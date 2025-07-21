@@ -29,11 +29,10 @@ impl ApnsProcessor {
 
         let mut device_hash_filter = String::new();
         if let Some(device_hash) = device_hash {
-            device_hash_filter = format!("dm.devicehash = '{}' AND", device_hash);
+            device_hash_filter = format!("dm.devicehash = '{device_hash}' AND");
         }
         let sql = format!(
-            "SELECT nm.url, dm.id, nm.id AS nId, dm.devicehash, dm.token, dm.sound_id, trim(nm.text) AS text, (case when _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' then ((_from, _to) OVERLAPS (current_time, current_time)) else (case when _from <= current_time OR _to >= current_time then true else false end) end) AS playsound, dm.paid, extract(epoch from nm.news_date) AS news_date, dm.type, nm.news_id FROM apns_master dm, news_master nm where (dm.news_id & nm.news_id = nm.news_id) AND {} nm.id = $1",
-            device_hash_filter
+            "SELECT nm.url, dm.id, nm.id AS nId, dm.devicehash, dm.token, dm.sound_id, trim(nm.text) AS text, (case when _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' then ((_from, _to) OVERLAPS (current_time, current_time)) else (case when _from <= current_time OR _to >= current_time then true else false end) end) AS playsound, dm.paid, extract(epoch from nm.news_date)::BIGINT AS news_date, dm.type, nm.news_id FROM apns_master dm, news_master nm where (dm.news_id & nm.news_id = nm.news_id) AND {device_hash_filter} nm.id = $1"
         );
 
         let fetch_task = tokio::spawn(async move {
@@ -42,7 +41,7 @@ impl ApnsProcessor {
                 .fetch(&pool);
             while let Some(notification) = stream.next().await {
                 match notification {
-                    Ok( notification) => {
+                    Ok(notification) => {
                         println!(
                             "Processing notification: ID={}, DeviceToken={}",
                             notification.id, notification.device_token
@@ -52,7 +51,7 @@ impl ApnsProcessor {
                         }
                     }
                     Err(err) => {
-                        eprintln!("Error fetching notification: {}", err);
+                        eprintln!("Error fetching notification: {err}");
                         continue;
                     }
                 }
@@ -86,7 +85,7 @@ impl ApnsProcessor {
         while let Some(result) = join_set.join_next().await {
             match result {
                 Ok(_) => println!("Worker completed successfully"),
-                Err(e) => eprintln!("Worker task panicked: {}", e),
+                Err(e) => eprintln!("Worker task panicked: {e}"),
             }
         }
     }

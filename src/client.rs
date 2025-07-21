@@ -57,6 +57,7 @@ impl ApnsClient {
             crate::apns::BreakingApnsType::App => "com.iavian.breakingnews",
             crate::apns::BreakingApnsType::Watch => "com.iavian.breakingnews.watchkitapp",
         };
+        println!("{payload}");
 
         let mut request = Request::builder()
             .method(Method::POST)
@@ -75,7 +76,12 @@ impl ApnsClient {
         }
 
         if let Some(collapse_id) = &notification.collapse_id {
-            request = request.header("apns-collapse-id", collapse_id);
+            request = request.header("apns-collapse-id", collapse_id.as_ref());
+        }
+        if notification.push_type == crate::apns::BreakingApnsType::Complication {
+            request = request.header("apns-push-type", "complication");
+        } else {
+            request = request.header("apns-push-type", "alert");
         }
 
         request = request.header("apns-id", &notification.id.to_string());
