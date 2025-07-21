@@ -8,15 +8,17 @@ use std::env;
 use actix_web::middleware::{self, Logger};
 use actix_web::web::Data;
 use actix_web::{App, HttpServer};
-use log::debug;
+use log::warn;
 
 use crate::config::ApnsConfig;
 use crate::handler::ok;
 use crate::handler::push;
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    env_logger::init();
-    debug!("Debug mode enabled");
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
+        .format_timestamp_secs() // Include timestamps in seconds
+        .init();
+    warn!("Starting APNs server");
 
     let port: u16 = env::var("PORT")
         .unwrap_or_else(|_| String::from("9090"))

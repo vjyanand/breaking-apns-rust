@@ -1,7 +1,7 @@
-use actix_web::{HttpResponse, Responder, web};
-use sqlx::{Pool, Postgres};
-
 use crate::{client::ApnsClient, config::ApnsConfig, processor::ApnsProcessor};
+use actix_web::{HttpResponse, Responder, web};
+use log::warn;
+use sqlx::{Pool, Postgres};
 
 #[actix_web::get("/")]
 pub async fn push(
@@ -23,6 +23,7 @@ pub async fn push(
             return HttpResponse::InternalServerError().body(format!("Error creating client: {e}"));
         }
     };
+    warn!("Connecting to Postgres");
     let pool =
         match Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking")
             .await
@@ -33,15 +34,12 @@ pub async fn push(
                     .body(format!("Error creating client: {e}"));
             }
         };
+    warn!("Connected to Postgres");
     let processor = ApnsProcessor::new(client, 9000);
-    // Connect to Postgres
-
-    //let device_hash = Some("B3C1E811-AF76-4E98-BED0-5F7D63B034B9".to_owned());
-
     processor
         .process_notifications(pool, news_id, device_hash)
         .await;
-
+    warn!("Finished processing notifications");
     HttpResponse::Ok().body("Ok")
 }
 
