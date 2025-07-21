@@ -140,7 +140,7 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
             } else {
                 None
             },
-            title: Some(Cow::Borrowed("Breaking News🚨")),
+            title: Some(Cow::Borrowed("Breaking News")),
             body: row.try_get("text")?,
         };
 
@@ -177,13 +177,17 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
             custom.insert("_u".into(), Value::String(url));
         }
         let payload = ApnsPayload { aps, custom };
-
+        let collapse_id = if paid {
+            Some(Cow::Borrowed(news_source))
+        } else {
+            Some(Cow::Borrowed("2"))
+        };
         Ok(Self {
             id: row.try_get("id")?,
             device_token: row.try_get("token")?,
             priority: Some(10),
             expiration: None,
-            collapse_id: Some(Cow::Borrowed("1")),
+            collapse_id,
             push_type,
             payload,
         })

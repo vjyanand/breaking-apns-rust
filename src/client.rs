@@ -21,11 +21,15 @@ pub struct ApnsClient {
 
 impl ApnsClient {
     pub fn new(config: &ApnsConfig) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let https_connector = HttpsConnector::new();
+        let mut https_connector = HttpsConnector::new();
+        https_connector.https_only(true);
         let client = LegacyClient::builder(TokioExecutor::new())
-            .pool_idle_timeout(Duration::from_secs(30))
-            .pool_max_idle_per_host(100)
+            .pool_idle_timeout(Duration::from_secs(60))
+            .pool_max_idle_per_host(20)
             .http2_only(true)
+            .http2_initial_stream_window_size(65_535) // Max stream window for HTTP/2
+            .http2_initial_connection_window_size(1_048_576) // 1MB connection window
+            .http2_adaptive_window(true)
             .build(https_connector);
 
         let base_url = if config.sandbox {
@@ -57,7 +61,7 @@ impl ApnsClient {
             crate::apns::BreakingApnsType::App => "com.iavian.breakingnews",
             crate::apns::BreakingApnsType::Watch => "com.iavian.breakingnews.watchkitapp",
         };
-        
+
         let mut request = Request::builder()
             .method(Method::POST)
             .uri(uri)
@@ -115,14 +119,12 @@ impl ApnsClient {
                 Some(error_message)
             },
         };
-
         if !result.success {
             eprintln!(
                 "APNs Failure: ID={}, APNS-ID={:?},Status={}, Error={:?}",
                 result.notification_id, result.apns_id, result.status_code, result.error
             );
         }
-
         Ok(result)
     }
 }
