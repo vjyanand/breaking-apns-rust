@@ -81,9 +81,8 @@ impl ApnsProcessor {
 
         let _ = fetch_task.await;
         while let Some(result) = join_set.join_next().await {
-            match result {
-                Ok(_) => println!("Worker completed successfully"),
-                Err(e) => eprintln!("Worker task panicked: {e}"),
+            if let Err(e) = result {
+                eprintln!("Worker task failed: {e}");
             }
         }
     }

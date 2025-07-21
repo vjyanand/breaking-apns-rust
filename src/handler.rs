@@ -33,7 +33,7 @@ pub async fn push(
                     .body(format!("Error creating client: {e}"));
             }
         };
-    let processor = ApnsProcessor::new(client, 4000);
+    let processor = ApnsProcessor::new(client, 9000);
     // Connect to Postgres
 
     //let device_hash = Some("B3C1E811-AF76-4E98-BED0-5F7D63B034B9".to_owned());
