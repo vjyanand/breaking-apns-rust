@@ -73,16 +73,17 @@ impl ApnsProcessor {
                         Some(notif) => match client.send_notification(notif).await {
                             Ok(result) => {
                                 if !result.success && result.status_code == 410 {
+                                    warn!("DB-DELETE-APNS Failure: ID={}, APNS-ID={:?}, Status={}, Error={:?}",result.notification_id, result.apns_id, result.status_code, result.error);
                                     if let Err(err) =
                                         sqlx::query("DELETE FROM apns_master WHERE id = $1")
                                             .bind(result.notification_id)
                                             .execute(&*worker_pool)
                                             .await
                                     {
-                                        warn!("Failed to delete APNs notification: {err}");
+                                        warn!("Failed to delete APNS notification: {err}");
                                     }
                                 } else if !result.success {
-                                    warn!("Failed to send APNs notification: {result:?}");
+                                    warn!("Failed to send APNS notification: {result:?}");
                                 }
                             }
                             Err(err) => {

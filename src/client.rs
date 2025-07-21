@@ -7,7 +7,6 @@ use hyper::{Method, Request, Uri};
 use hyper_tls::HttpsConnector;
 use hyper_util::client::legacy::Client as LegacyClient;
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
-use log::warn;
 
 use crate::apns::PushNotification;
 use crate::apns::PushResult;
@@ -120,17 +119,6 @@ impl ApnsClient {
                 Some(error_message)
             },
         };
-        if !result.success && result.status_code == 410 {
-            warn!(
-                "DB-dELETE-APNs Failure: ID={}, APNS-ID={:?},Status={}, Error={:?}",
-                result.notification_id, result.apns_id, result.status_code, result.error
-            );
-        } else if !result.success {
-            warn!(
-                "APNs Failure: ID={}, APNS-ID={:?},Status={}, Error={:?}",
-                result.notification_id, result.apns_id, result.status_code, result.error
-            );
-        }
         Ok(result)
     }
 }
