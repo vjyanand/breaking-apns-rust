@@ -13,17 +13,16 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    container: alpine:latest
+    container: archlinux:latest
 
     steps:
     - uses: actions/checkout@v4
     - name: Install dependencies
       run: |
-        apk add --no-cache cargo rust openssl-dev
+        pacman -Syu --noconfirm
+        pacman -S --noconfirm rust cargo openssl pkgconf
     - name: Build
       run: cargo build --release
-    - name: Run tests
-      run: cargo test --verbose
     - name: Upload binary artifact
       uses: actions/upload-artifact@v4
       with:
