@@ -81,6 +81,8 @@ impl ApnsProcessor {
                                     {
                                         warn!("Failed to delete APNs notification: {err}");
                                     }
+                                } else if !result.success {
+                                    warn!("Failed to send APNs notification: {result:?}");
                                 }
                             }
                             Err(err) => {

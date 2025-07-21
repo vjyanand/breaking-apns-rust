@@ -18,7 +18,6 @@ async fn main() -> std::io::Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
         .format_timestamp_secs() // Include timestamps in seconds
         .init();
-    warn!("Starting APNs server");
 
     let port: u16 = env::var("PORT")
         .unwrap_or_else(|_| String::from("9090"))
@@ -26,6 +25,9 @@ async fn main() -> std::io::Result<()> {
         .expect("PORT must be a number");
 
     let binding_interface = format!("0.0.0.0:{port}");
+
+    warn!("Starting APNs server at {binding_interface}");
+
     let config = ApnsConfig {
         key_id: "9F437T6Y4G".to_string(),
         team_id: "JX83D66C47".to_string(),
