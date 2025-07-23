@@ -177,11 +177,12 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
             custom.insert("_u".into(), Value::String(url));
         }
         let payload = ApnsPayload { aps, custom };
-        let collapse_id = if paid {
-            Some(Cow::Borrowed(news_source))
-        } else {
-            Some(Cow::Borrowed("2"))
-        };
+        let collapse_id = Some(Cow::Borrowed(news_source));
+        // let collapse_id = if paid {
+        //     Some(Cow::Borrowed(news_source))
+        // } else {
+        //     Some(Cow::Borrowed("2"))
+        // };
         Ok(Self {
             id: row.try_get("id")?,
             device_token: row.try_get("token")?,
