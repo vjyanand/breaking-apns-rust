@@ -35,7 +35,7 @@ pub async fn push(
             }
         };
     warn!("Connected to Postgres");
-    let processor = ApnsProcessor::new(client, 9900);
+    let processor = ApnsProcessor::new(client, 9000);
     processor
         .process_notifications(pool, news_id, device_hash)
         .await;
