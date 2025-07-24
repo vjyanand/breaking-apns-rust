@@ -26,8 +26,7 @@ impl ApnsProcessor {
         news_id: i64,
         device_hash: Option<&String>,
     ) {
-        let (tx, rx) = mpsc::channel(9100);
-
+        let (tx, rx) = mpsc::channel(10100);
         let mut device_hash_filter = String::new();
         if let Some(device_hash) = device_hash {
             device_hash_filter = format!("dm.devicehash = '{device_hash}' AND");
