@@ -101,8 +101,8 @@ impl ApnsClient {
             .map(|s| s.to_string())
             .unwrap_or(notification.id.to_string());
 
-        let body_bytes = response.collect().await?.to_bytes();
-        let error_message = if !status.is_success() && !body_bytes.is_empty() {
+        let error_message = if !status.is_success() {
+            let body_bytes = response.collect().await?.to_bytes();
             String::from_utf8_lossy(&body_bytes).to_string()
         } else {
             String::new()

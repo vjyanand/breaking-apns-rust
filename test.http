@@ -1,4 +1,4 @@
-GET http://localhost:9090/?newsId=387933&deviceHash=B3C1E811-AF76-4E98-BED0-5F7D63B034B9
+GET http://localhost:9090/?newsId=387933&deviceHash=AF2DA8D0-A553-4097-89DC-A140F5C039FB
 
 ###
 
