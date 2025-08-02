@@ -3,19 +3,24 @@ use crate::client::ApnsClient;
 use log::warn;
 use sqlx::{Pool, Postgres};
 use std::sync::Arc;
-use tokio::{sync::mpsc, task::JoinSet};
+use tokio::{
+    sync::{Semaphore, mpsc},
+    task::JoinSet,
+};
 use tokio_stream::StreamExt;
 
 pub struct ApnsProcessor {
-    client: ApnsClient,
+    client: Arc<ApnsClient>,
     worker_count: usize,
+    max_concurrent_requests: usize,
 }
 
 impl ApnsProcessor {
     pub fn new(client: ApnsClient, worker_count: usize) -> Self {
         Self {
-            client,
+            client: Arc::new(client),
             worker_count,
+            max_concurrent_requests: worker_count * 50,
         }
     }
 
@@ -25,11 +30,7 @@ impl ApnsProcessor {
         news_id: i64,
         device_hash: Option<&String>,
     ) {
-        // Create a channel for distributing notifications to workers
-        let (tx, mut rx) = mpsc::channel(10100);
-        let pool = Arc::new(pool);
-
-        // Construct the SQL query
+        //let pool = Arc::new(pool);
         let mut device_hash_filter = String::new();
         if let Some(device_hash) = device_hash {
             device_hash_filter = format!("dm.devicehash = '{device_hash}' AND");
@@ -42,9 +43,10 @@ impl ApnsProcessor {
             FROM apns_master dm, news_master nm \
             WHERE (dm.news_id & nm.news_id = nm.news_id) AND {device_hash_filter} nm.id = $1"
         );
-
-        // Spawn a task to fetch notifications and send them to the channel
+        let pool = Arc::new(pool);
         let fetch_pool = Arc::clone(&pool);
+        let (tx, rx) = mpsc::channel(51000);
+        let semaphore = Arc::new(Semaphore::new(self.max_concurrent_requests));
         let fetch_task = tokio::spawn(async move {
             let mut stream = sqlx::query_as::<_, PushNotification>(&sql)
                 .bind(news_id)
@@ -59,67 +61,70 @@ impl ApnsProcessor {
                     }
                     Err(err) => {
                         warn!("Error fetching notification: {err}");
-                        continue;
                     }
                 }
             }
-            // Channel is dropped automatically when fetch_task completes
         });
 
-        // Create worker channels
-        let mut worker_txs = Vec::new();
         let mut join_set = JoinSet::new();
-        for _ in 0..self.worker_count {
-            let (worker_tx, mut worker_rx) = mpsc::channel(100);
-            worker_txs.push(worker_tx);
+        let rx = Arc::new(tokio::sync::Mutex::new(rx));
+        let w_client = Arc::clone(&self.client);
 
-            // Spawn a worker task
-            let client = self.client.clone();
+        for _ in 0..self.worker_count {
             let worker_pool = Arc::clone(&pool);
+            let worker_client = Arc::clone(&w_client);
+            let worker_rx = Arc::clone(&rx);
+            let worker_semaphore = Arc::clone(&semaphore);
+
             join_set.spawn(async move {
-                while let Some(notif) = worker_rx.recv().await {
-                    match client.send_notification(notif).await {
-                        Ok(result) => {
-                            if !result.success && result.status_code == 410 {
-                                warn!(
-                                    "DB-DELETE-APNS Failure: ID={}, APNS-ID={:?}, Status={}, Error={:?}",
-                                    result.notification_id, result.apns_id, result.status_code, result.error
-                                );
-                                if let Err(err) = sqlx::query("DELETE FROM apns_master WHERE id = $1")
-                                    .bind(result.notification_id)
-                                    .execute(&*worker_pool)
-                                    .await
-                                {
-                                    warn!("Failed to delete APNS notification: {err}");
+                let mut worker_join_set = JoinSet::new();
+                loop {
+                    let notif = {
+                        let mut rx_guard = worker_rx.lock().await;
+                        match rx_guard.recv().await {
+                            Some(notif) => notif,
+                            None => break, // Channel closed
+                        }
+                    };
+
+                    let permit = worker_semaphore.clone().acquire_owned().await;
+                    if let Ok(_permit) = permit {
+                        let sub_worker_client = Arc::clone(&worker_client);
+                        let sub_worker_pool = Arc::clone(&worker_pool);
+                        worker_join_set.spawn(async move {
+                            match sub_worker_client.send_notification(notif).await {
+                                Ok(result) => {
+                                    if !result.success && result.status_code == 410 {
+                                        warn!(
+                                            "DB-DELETE-APNS Failure: ID={}, APNS-ID={:?}, Status={}, Error={:?}",
+                                            result.notification_id, result.apns_id, result.status_code, result.error
+                                        );
+                                        if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(result.notification_id).execute(&*sub_worker_pool).await {
+                                             warn!("Failed to updated failed APNS notification: {err}");
+                                        }
+                                    } else if !result.success {
+                                        warn!("Failed to send APNS notification: {result:?}");
+                                    }
+                                },
+                                Err(err) => {
+                                    warn!("Error sending notification: {err}");
                                 }
-                            } else if !result.success {
-                                warn!("Failed to send APNS notification: {result:?}");
                             }
-                        }
-                        Err(err) => {
-                            warn!("Error sending notification: {err}");
-                        }
+                        });
+                    };
+                }
+                while let Some(result) = worker_join_set.join_next().await {
+                    if let Err(e) = result {
+                        warn!("Individual request failed: {e}");
                     }
                 }
             });
         }
 
-        // Distribute notifications to workers in a round-robin fashion
-        let mut worker_index = 0;
-        while let Some(notification) = rx.recv().await {
-            if worker_txs[worker_index].send(notification).await.is_err() {
-                warn!("Failed to send notification to worker {}", worker_index);
-            }
-            worker_index = (worker_index + 1) % self.worker_count;
-        }
-
-        // Drop all worker senders to close their channels
-        drop(worker_txs);
-
-        // Wait for fetch task and workers to complete
         if let Err(e) = fetch_task.await {
             warn!("Fetch task failed: {e}");
         }
+
         while let Some(result) = join_set.join_next().await {
             if let Err(e) = result {
                 warn!("Worker task failed: {e}");

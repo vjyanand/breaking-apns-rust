@@ -3,3 +3,6 @@ GET http://localhost:9090/?newsId=387933&deviceHash=AF2DA8D0-A553-4097-89DC-A140
 ###
 
 GET http://localhost:9090/stats
+
+
+##cargo flamegraph   --bin rust-breaking --no-inline --skip-after "std::" --skip-after "core::" --skip-after "alloc::" --skip-after "__rust" --skip-after "rustc_" --deterministic

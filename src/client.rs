@@ -52,8 +52,8 @@ impl ApnsClient {
         notification: PushNotification,
     ) -> Result<PushResult, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/3/device/{}", self.base_url, notification.device_token);
-        let uri: Uri = url.parse()?;
-        let payload = serde_json::to_string(&notification.payload)?;
+        let uri: Uri = url.parse().unwrap();
+        let payload = serde_json::to_string(&notification.payload).unwrap();
         let topic = match notification.push_type {
             crate::apns::BreakingApnsType::Complication => {
                 "com.iavian.breakingnews.watchkitapp.complication"
@@ -61,7 +61,6 @@ impl ApnsClient {
             crate::apns::BreakingApnsType::App => "com.iavian.breakingnews",
             crate::apns::BreakingApnsType::Watch => "com.iavian.breakingnews.watchkitapp",
         };
-
         let mut request = Request::builder()
             .method(Method::POST)
             .uri(uri)
@@ -90,24 +89,21 @@ impl ApnsClient {
         request = request.header("apns-id", &notification.id.to_string());
 
         let request = request.body(Full::new(Bytes::from(payload)))?;
-
         let response = self.client.request(request).await?;
         let status = response.status();
-        let headers = response.headers().clone();
 
-        let apns_id_header = headers
+        let apns_id_header = response
+            .headers()
             .get("apns-id")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string())
             .unwrap_or(notification.id.to_string());
-
         let error_message = if !status.is_success() {
             let body_bytes = response.collect().await?.to_bytes();
             String::from_utf8_lossy(&body_bytes).to_string()
         } else {
             String::new()
         };
-
         let result = PushResult {
             notification_id: notification.id,
             success: status.is_success(),

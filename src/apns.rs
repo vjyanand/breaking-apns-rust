@@ -1,9 +1,7 @@
-use std::borrow::Cow;
-
-use phf::phf_map;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sqlx::{FromRow, Row, Type};
+use std::borrow::Cow;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -53,76 +51,84 @@ pub enum BreakingApnsType {
     Complication,
 }
 
-// Static lookup tables using phf for zero-allocation lookups
-static SOURCE_NAMES: phf::Map<i64, &'static str> = phf_map! {
-    1_i64 => "CNN",
-    2_i64 => "WSJ",
-    4_i64 => "MSNBC",
-    8_i64 => "BBC",
-    16_i64 => "NPR",
-    32_i64 => "CNBC",
-    64_i64 => "TMZ",
-    128_i64 => "Boston Globe",
-    256_i64 => "The Spectator Index",
-    512_i64 => "Fox News",
-    1024_i64 => "Fox Business",
-    2048_i64 => "NYT",
-    4096_i64 => "AP",
-    8192_i64 => "NYP",
-    16384_i64 => "CBS News",
-    32768_i64 => "France 24",
-    65536_i64 => "ESPN",
-    131072_i64 => "ABC News",
-    262144_i64 => "NBC News",
-    524288_i64 => "AFP",
-    1048576_i64 => "Sky News",
-    2097152_i64 => "Bloomberg",
-    4194304_i64 => "NigeriaStories",
-    8388608_i64 => "Sky Sports",
-    16777216_i64 => "People's Daily",
-    33554432_i64 => "Al Jazeera",
-    67108864_i64 => "Reuters",
-    134217728_i64 => "XHNews",
-    268435456_i64 => "Politico",
-    536870912_i64 => "Times Of India",
-    1073741824_i64 => "USA TODAY",
-    2147483648_i64 => "HuffPost",
-    4294967296_i64 => "The Hill",
-    8589934592_i64 => "NFL",
-    17179869184_i64 => "NHKニュース",
-    34359738368_i64 => "TorontoStar",
-    68719476736_i64 => "Sky News Australia",
-    137438953472_i64 => "The Washington Post",
-    274877906944_i64 => "Forbes",
-    549755813888_i64 => "Financial Times",
-    1099511627776_i64 => "ABS-CBN News",
-    2199023255552_i64 => "The National",
-    4398046511104_i64 => "Israel News",
-    8796093022208_i64 => "NZ News",
-    17592186044416_i64 => "DW News",
-    35184372088832_i64 => "Newsmax",
-    70368744177664_i64 => "RedState",
-    140737488355328_i64 => "TheBlaze",
-    281474976710656_i64 => "Agenzia ANSA",
-};
+// Convert to const lookup for better performance
+const fn get_source_name(id: i64) -> &'static str {
+    match id {
+        1 => "CNN",
+        2 => "WSJ",
+        4 => "MSNBC",
+        8 => "BBC",
+        16 => "NPR",
+        32 => "CNBC",
+        64 => "TMZ",
+        128 => "Boston Globe",
+        256 => "The Spectator Index",
+        512 => "Fox News",
+        1024 => "Fox Business",
+        2048 => "NYT",
+        4096 => "AP",
+        8192 => "NYP",
+        16384 => "CBS News",
+        32768 => "France 24",
+        65536 => "ESPN",
+        131072 => "ABC News",
+        262144 => "NBC News",
+        524288 => "AFP",
+        1048576 => "Sky News",
+        2097152 => "Bloomberg",
+        4194304 => "NigeriaStories",
+        8388608 => "Sky Sports",
+        16777216 => "People's Daily",
+        33554432 => "Al Jazeera",
+        67108864 => "Reuters",
+        134217728 => "XHNews",
+        268435456 => "Politico",
+        536870912 => "Times Of India",
+        1073741824 => "USA TODAY",
+        2147483648 => "HuffPost",
+        4294967296 => "The Hill",
+        8589934592 => "NFL",
+        17179869184 => "NHKニュース",
+        34359738368 => "TorontoStar",
+        68719476736 => "Sky News Australia",
+        137438953472 => "The Washington Post",
+        274877906944 => "Forbes",
+        549755813888 => "Financial Times",
+        1099511627776 => "ABS-CBN News",
+        2199023255552 => "The National",
+        4398046511104 => "Israel News",
+        8796093022208 => "NZ News",
+        17592186044416 => "DW News",
+        35184372088832 => "Newsmax",
+        70368744177664 => "RedState",
+        140737488355328 => "TheBlaze",
+        281474976710656 => "Agenzia ANSA",
+        _ => "WSJ❔",
+    }
+}
 
-static SOUND_NAMES: phf::Map<i16, &'static str> = phf_map! {
-    0_i16 => "",
-    1_i16 => "default",
-    2_i16 => "g.caf",
-    3_i16 => "p.caf",
-    4_i16 => "s.caf",
-    5_i16 => "gl.caf",
-    6_i16 => "sm.caf",
-    7_i16 => "w.caf",
-};
+use std::collections::HashMap;
+use std::sync::OnceLock;
 
-fn get_source_name(news_id: i64) -> &'static str {
-    SOURCE_NAMES.get(&news_id).copied().unwrap_or("WSJ❔")
+static SOUND_NAMES: OnceLock<HashMap<i16, &'static str>> = OnceLock::new();
+
+fn get_sound_names_map() -> &'static HashMap<i16, &'static str> {
+    SOUND_NAMES.get_or_init(|| {
+        let mut map = HashMap::new();
+        map.insert(0, "");
+        map.insert(1, "default");
+        map.insert(2, "g.caf");
+        map.insert(3, "p.caf");
+        map.insert(4, "s.caf");
+        map.insert(5, "gl.caf");
+        map.insert(6, "sm.caf");
+        map.insert(7, "w.caf");
+        map
+    })
 }
 
 fn get_sound_name(sound_id: i16) -> &'static str {
-    SOUND_NAMES.get(&sound_id).copied().unwrap_or("default")
+    get_sound_names_map().get(&sound_id).unwrap_or(&"default")
 }
 
 impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
@@ -131,9 +137,13 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
         let playsound: bool = row.try_get("playsound")?;
         let sound_id: i16 = row.try_get("sound_id")?;
         let news_id: i64 = row.try_get("news_id")?;
+
+        // Direct lookup - no caching needed if news_id is the same for all rows
         let news_source = get_source_name(news_id);
+
         let push_type: BreakingApnsType = row.try_get("type")?;
         let news_date: i64 = row.try_get("news_date")?;
+
         let alert = AlertPayload {
             subtitle: if paid {
                 Some(Cow::Borrowed(news_source))
@@ -162,11 +172,12 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
             content_available: None,
         };
 
-        let mut custom = Map::with_capacity(2);
+        let mut custom = Map::with_capacity(5); // Preallocate correct capacity
         custom.insert("s".into(), Value::String(news_source.into()));
         custom.insert("nid".into(), Value::Number(news_id.into()));
         custom.insert("p".into(), Value::Bool(paid));
         custom.insert("t".into(), Value::Number(news_date.into()));
+
         let url = row.try_get::<String, _>("url")?;
         if url.len() < 3 {
             custom.insert(
@@ -176,13 +187,10 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
         } else {
             custom.insert("_u".into(), Value::String(url));
         }
+
         let payload = ApnsPayload { aps, custom };
         let collapse_id = Some(Cow::Borrowed(news_source));
-        // let collapse_id = if paid {
-        //     Some(Cow::Borrowed(news_source))
-        // } else {
-        //     Some(Cow::Borrowed("2"))
-        // };
+
         Ok(Self {
             id: row.try_get("id")?,
             device_token: row.try_get("token")?,

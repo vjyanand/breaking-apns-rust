@@ -25,7 +25,7 @@ pub async fn push(
     };
     warn!("Connecting to Postgres");
     let pool =
-        match Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking")
+        match Pool::<Postgres>::connect("postgres://breaking:qwertY123@localhost/breaking")
             .await
         {
             Ok(pool) => pool,
