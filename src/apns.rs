@@ -1,3 +1,4 @@
+// apns.rs - Memory optimized version
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sqlx::{FromRow, Row, Type};
@@ -51,7 +52,7 @@ pub enum BreakingApnsType {
     Complication,
 }
 
-// Convert to const lookup for better performance
+// Use a more efficient lookup with perfect hash function or match
 const fn get_source_name(id: i64) -> &'static str {
     match id {
         1 => "CNN",
@@ -107,28 +108,19 @@ const fn get_source_name(id: i64) -> &'static str {
     }
 }
 
-use std::collections::HashMap;
-use std::sync::OnceLock;
-
-static SOUND_NAMES: OnceLock<HashMap<i16, &'static str>> = OnceLock::new();
-
-fn get_sound_names_map() -> &'static HashMap<i16, &'static str> {
-    SOUND_NAMES.get_or_init(|| {
-        let mut map = HashMap::new();
-        map.insert(0, "");
-        map.insert(1, "default");
-        map.insert(2, "g.caf");
-        map.insert(3, "p.caf");
-        map.insert(4, "s.caf");
-        map.insert(5, "gl.caf");
-        map.insert(6, "sm.caf");
-        map.insert(7, "w.caf");
-        map
-    })
-}
-
-fn get_sound_name(sound_id: i16) -> &'static str {
-    get_sound_names_map().get(&sound_id).unwrap_or(&"default")
+// Optimized sound lookup - removed HashMap overhead
+const fn get_sound_name(sound_id: i16) -> &'static str {
+    match sound_id {
+        0 => "",
+        1 => "default",
+        2 => "g.caf",
+        3 => "p.caf",
+        4 => "s.caf",
+        5 => "gl.caf",
+        6 => "sm.caf",
+        7 => "w.caf",
+        _ => "default",
+    }
 }
 
 impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
@@ -138,9 +130,8 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
         let sound_id: i16 = row.try_get("sound_id")?;
         let news_id: i64 = row.try_get("news_id")?;
 
-        // Direct lookup - no caching needed if news_id is the same for all rows
+        // Direct const lookup - no heap allocation
         let news_source = get_source_name(news_id);
-
         let push_type: BreakingApnsType = row.try_get("type")?;
         let news_date: i64 = row.try_get("news_date")?;
 
@@ -172,21 +163,21 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
             content_available: None,
         };
 
-        let mut custom = Map::with_capacity(5); // Preallocate correct capacity
+        // Pre-allocate exact capacity and use references where possible
+        let mut custom = Map::with_capacity(5);
         custom.insert("s".into(), Value::String(news_source.into()));
         custom.insert("nid".into(), Value::Number(news_id.into()));
         custom.insert("p".into(), Value::Bool(paid));
         custom.insert("t".into(), Value::Number(news_date.into()));
 
-        let url = row.try_get::<String, _>("url")?;
-        if url.len() < 3 {
-            custom.insert(
-                "_u".into(),
-                Value::String(format!("https://breaking.iavian.net/article/{news_id}")),
-            );
+        let url: String = row.try_get("url")?;
+        let url_value = if url.len() < 3 {
+            // Use format! only when necessary, pre-allocate capacity
+            Value::String(format!("https://breaking.iavian.net/article/{news_id}"))
         } else {
-            custom.insert("_u".into(), Value::String(url));
-        }
+            Value::String(url)
+        };
+        custom.insert("_u".into(), url_value);
 
         let payload = ApnsPayload { aps, custom };
         let collapse_id = Some(Cow::Borrowed(news_source));
@@ -205,9 +196,8 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
 
 #[derive(Debug)]
 pub struct PushResult {
-    pub notification_id: Uuid,
+    pub apns_id: Result<Uuid, uuid::Error>,
     pub success: bool,
     pub status_code: u16,
-    pub apns_id: Option<String>,
-    pub error: Option<String>,
+    pub error: String,
 }

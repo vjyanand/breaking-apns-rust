@@ -11,16 +11,14 @@ use tokio_stream::StreamExt;
 
 pub struct ApnsProcessor {
     client: Arc<ApnsClient>,
-    worker_count: usize,
     max_concurrent_requests: usize,
 }
 
 impl ApnsProcessor {
-    pub fn new(client: ApnsClient, worker_count: usize) -> Self {
+    pub fn new(client: ApnsClient) -> Self {
         Self {
             client: Arc::new(client),
-            worker_count,
-            max_concurrent_requests: worker_count * 50,
+            max_concurrent_requests: 10000,
         }
     }
 
@@ -30,7 +28,6 @@ impl ApnsProcessor {
         news_id: i64,
         device_hash: Option<&String>,
     ) {
-        //let pool = Arc::new(pool);
         let mut device_hash_filter = String::new();
         if let Some(device_hash) = device_hash {
             device_hash_filter = format!("dm.devicehash = '{device_hash}' AND");
@@ -45,7 +42,7 @@ impl ApnsProcessor {
         );
         let pool = Arc::new(pool);
         let fetch_pool = Arc::clone(&pool);
-        let (tx, rx) = mpsc::channel(51000);
+        let (tx, mut rx) = mpsc::channel(9000);
         let semaphore = Arc::new(Semaphore::new(self.max_concurrent_requests));
         let fetch_task = tokio::spawn(async move {
             let mut stream = sqlx::query_as::<_, PushNotification>(&sql)
@@ -64,61 +61,49 @@ impl ApnsProcessor {
                     }
                 }
             }
+            drop(tx);
         });
 
         let mut join_set = JoinSet::new();
-        let rx = Arc::new(tokio::sync::Mutex::new(rx));
-        let w_client = Arc::clone(&self.client);
-
-        for _ in 0..self.worker_count {
-            let worker_pool = Arc::clone(&pool);
-            let worker_client = Arc::clone(&w_client);
-            let worker_rx = Arc::clone(&rx);
-            let worker_semaphore = Arc::clone(&semaphore);
-
-            join_set.spawn(async move {
-                let mut worker_join_set = JoinSet::new();
-                loop {
-                    let notif = {
-                        let mut rx_guard = worker_rx.lock().await;
-                        match rx_guard.recv().await {
-                            Some(notif) => notif,
-                            None => break, // Channel closed
-                        }
-                    };
-
-                    let permit = worker_semaphore.clone().acquire_owned().await;
-                    if let Ok(_permit) = permit {
-                        let sub_worker_client = Arc::clone(&worker_client);
-                        let sub_worker_pool = Arc::clone(&worker_pool);
-                        worker_join_set.spawn(async move {
-                            match sub_worker_client.send_notification(notif).await {
-                                Ok(result) => {
-                                    if !result.success && result.status_code == 410 {
+        while let Some(notification) = rx.recv().await {
+            let permit = semaphore.clone().acquire_owned().await;
+            if let Ok(_permit) = permit {
+                let client = Arc::clone(&self.client);
+                let pool_ref = Arc::clone(&pool);
+                join_set.spawn(async move {
+                    let _permit = _permit;
+                    match client.send_notification(notification).await {
+                        Ok(result) => {
+                            if let Some(result) = result {
+                                if !result.success && result.status_code == 410 {
+                                    if let Ok(apns_id) = result.apns_id {
                                         warn!(
-                                            "DB-DELETE-APNS Failure: ID={}, APNS-ID={:?}, Status={}, Error={:?}",
-                                            result.notification_id, result.apns_id, result.status_code, result.error
+                                            "DB-UPDATE-APNS_FAIL: ID={}, Status={}, Error={:?}",
+                                            apns_id, result.status_code, result.error
                                         );
-                                        if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(result.notification_id).execute(&*sub_worker_pool).await {
-                                             warn!("Failed to updated failed APNS notification: {err}");
+                                        if let Err(err) = sqlx::query(
+                                            "UPDATE apns_master SET news_id = 0 WHERE id = $1",
+                                        )
+                                        .bind(apns_id)
+                                        .execute(&*pool_ref)
+                                        .await
+                                        {
+                                            warn!("Failed to update APNS notification: {err}");
                                         }
-                                    } else if !result.success {
-                                        warn!("Failed to send APNS notification: {result:?}");
+                                    } else {
+                                        warn!("Failed to parse APNS notification: {result:?}");
                                     }
-                                },
-                                Err(err) => {
-                                    warn!("Error sending notification: {err}");
+                                } else if !result.success {
+                                    warn!("APNS notification send error: {result:?}");
                                 }
                             }
-                        });
-                    };
-                }
-                while let Some(result) = worker_join_set.join_next().await {
-                    if let Err(e) = result {
-                        warn!("Individual request failed: {e}");
+                        }
+                        Err(err) => {
+                            warn!("Error sending notification: {err}");
+                        }
                     }
-                }
-            });
+                });
+            }
         }
 
         if let Err(e) = fetch_task.await {

@@ -7,6 +7,7 @@ use hyper::{Method, Request, Uri};
 use hyper_tls::HttpsConnector;
 use hyper_util::client::legacy::Client as LegacyClient;
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
+use uuid::Uuid;
 
 use crate::apns::PushNotification;
 use crate::apns::PushResult;
@@ -50,7 +51,7 @@ impl ApnsClient {
     pub async fn send_notification(
         &self,
         notification: PushNotification,
-    ) -> Result<PushResult, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<Option<PushResult>, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/3/device/{}", self.base_url, notification.device_token);
         let uri: Uri = url.parse().unwrap();
         let payload = serde_json::to_string(&notification.payload).unwrap();
@@ -92,29 +93,23 @@ impl ApnsClient {
         let response = self.client.request(request).await?;
         let status = response.status();
 
-        let apns_id_header = response
-            .headers()
-            .get("apns-id")
-            .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string())
-            .unwrap_or(notification.id.to_string());
-        let error_message = if !status.is_success() {
+        if !status.is_success() {
+            let apns_id_header = response
+                .headers()
+                .get("apns-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string())
+                .unwrap_or(notification.id.to_string());
+            let apns_id = Uuid::parse_str(&apns_id_header);
             let body_bytes = response.collect().await?.to_bytes();
-            String::from_utf8_lossy(&body_bytes).to_string()
-        } else {
-            String::new()
-        };
-        let result = PushResult {
-            notification_id: notification.id,
-            success: status.is_success(),
-            status_code: status.as_u16(),
-            apns_id: Some(apns_id_header),
-            error: if error_message.is_empty() {
-                None
-            } else {
-                Some(error_message)
-            },
-        };
-        Ok(result)
+            let error_message = String::from_utf8_lossy(&body_bytes).to_string();
+            return Ok(Some(PushResult {
+                apns_id,
+                success: status.is_success(),
+                status_code: status.as_u16(),
+                error: error_message,
+            }));
+        }
+        Ok(None)
     }
 }

@@ -23,9 +23,9 @@ pub async fn push(
             return HttpResponse::InternalServerError().body(format!("Error creating client: {e}"));
         }
     };
-    warn!("Connecting to Postgres");
+    warn!("Connecting to Postgres {news_id}");
     let pool =
-        match Pool::<Postgres>::connect("postgres://breaking:qwertY123@localhost/breaking")
+        match Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking")
             .await
         {
             Ok(pool) => pool,
@@ -34,12 +34,12 @@ pub async fn push(
                     .body(format!("Error creating client: {e}"));
             }
         };
-    warn!("Connected to Postgres");
-    let processor = ApnsProcessor::new(client, 10000);
+    warn!("Connected to Postgres {news_id}");
+    let processor = ApnsProcessor::new(client);
     processor
         .process_notifications(pool, news_id, device_hash)
         .await;
-    warn!("Finished processing notifications");
+    warn!("Finished processing notifications {news_id}");
     HttpResponse::Ok().body("Ok")
 }
 
