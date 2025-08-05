@@ -31,4 +31,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: rust-binary
-        path: target/release/rust-breaking
+        path: target/release/serverAPNS
