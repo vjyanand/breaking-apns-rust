@@ -136,32 +136,19 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
         let news_date: i64 = row.try_get("news_date")?;
 
         let alert = AlertPayload {
-            subtitle: if paid {
-                Some(Cow::Borrowed(news_source))
-            } else {
-                None
-            },
+            subtitle: if paid { Some(Cow::Borrowed(news_source)) } else { None },
             title: Some(Cow::Borrowed("Breaking News")),
             body: row.try_get("text")?,
         };
 
         let sound = if playsound {
             let sound_name = get_sound_name(sound_id);
-            if sound_name.is_empty() {
-                None
-            } else {
-                Some(Cow::Borrowed(sound_name))
-            }
+            if sound_name.is_empty() { None } else { Some(Cow::Borrowed(sound_name)) }
         } else {
             None
         };
 
-        let aps = ApsPayload {
-            alert: Some(alert),
-            badge: None,
-            sound,
-            content_available: None,
-        };
+        let aps = ApsPayload { alert: Some(alert), badge: None, sound, content_available: None };
 
         // Pre-allocate exact capacity and use references where possible
         let mut custom = Map::with_capacity(5);

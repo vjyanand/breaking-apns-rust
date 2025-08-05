@@ -4,10 +4,7 @@ use log::warn;
 use sqlx::{Pool, Postgres};
 
 #[actix_web::get("/")]
-pub async fn push(
-    config: web::Data<ApnsConfig>,
-    query: web::Query<std::collections::HashMap<String, String>>,
-) -> impl Responder {
+pub async fn push(config: web::Data<ApnsConfig>, query: web::Query<std::collections::HashMap<String, String>>) -> impl Responder {
     let news_id = match query.get("newsId") {
         Some(id) => match id.parse::<i64>() {
             Ok(id) => id,
@@ -24,21 +21,15 @@ pub async fn push(
         }
     };
     warn!("Connecting to Postgres {news_id}");
-    let pool =
-        match Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking")
-            .await
-        {
-            Ok(pool) => pool,
-            Err(e) => {
-                return HttpResponse::InternalServerError()
-                    .body(format!("Error creating client: {e}"));
-            }
-        };
+    let pool = match Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await {
+        Ok(pool) => pool,
+        Err(e) => {
+            return HttpResponse::InternalServerError().body(format!("Error creating client: {e}"));
+        }
+    };
     warn!("Connected to Postgres {news_id}");
     let processor = ApnsProcessor::new(client);
-    processor
-        .process_notifications(pool, news_id, device_hash)
-        .await;
+    processor.process_notifications(pool, news_id, device_hash).await;
     warn!("Finished processing notifications {news_id}");
     HttpResponse::Ok().body("Ok")
 }

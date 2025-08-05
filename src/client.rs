@@ -28,37 +28,24 @@ impl ApnsClient {
             .pool_idle_timeout(Duration::from_secs(60))
             .pool_max_idle_per_host(20)
             .http2_only(true)
-            .http2_initial_stream_window_size(65_535) // Max stream window for HTTP/2
-            .http2_initial_connection_window_size(1_048_576) // 1MB connection window
+            .http2_initial_stream_window_size(32_768) // Max stream window for HTTP/2
+            .http2_initial_connection_window_size(262_144) // 1MB connection window
             .http2_adaptive_window(true)
             .build(https_connector);
 
-        let base_url = if config.sandbox {
-            "https://api.sandbox.push.apple.com".to_string()
-        } else {
-            "https://api.push.apple.com".to_string()
-        };
+        let base_url = if config.sandbox { "https://api.sandbox.push.apple.com".to_string() } else { "https://api.push.apple.com".to_string() };
 
         let jwt_token = config.generate_jwt()?;
 
-        Ok(Self {
-            client,
-            base_url,
-            jwt_token,
-        })
+        Ok(Self { client, base_url, jwt_token })
     }
 
-    pub async fn send_notification(
-        &self,
-        notification: PushNotification,
-    ) -> Result<Option<PushResult>, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn send_notification(&self, notification: PushNotification) -> Result<Option<PushResult>, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/3/device/{}", self.base_url, notification.device_token);
         let uri: Uri = url.parse().unwrap();
         let payload = serde_json::to_string(&notification.payload).unwrap();
         let topic = match notification.push_type {
-            crate::apns::BreakingApnsType::Complication => {
-                "com.iavian.breakingnews.watchkitapp.complication"
-            }
+            crate::apns::BreakingApnsType::Complication => "com.iavian.breakingnews.watchkitapp.complication",
             crate::apns::BreakingApnsType::App => "com.iavian.breakingnews",
             crate::apns::BreakingApnsType::Watch => "com.iavian.breakingnews.watchkitapp",
         };
@@ -103,12 +90,7 @@ impl ApnsClient {
             let apns_id = Uuid::parse_str(&apns_id_header);
             let body_bytes = response.collect().await?.to_bytes();
             let error_message = String::from_utf8_lossy(&body_bytes).to_string();
-            return Ok(Some(PushResult {
-                apns_id,
-                success: status.is_success(),
-                status_code: status.as_u16(),
-                error: error_message,
-            }));
+            return Ok(Some(PushResult { apns_id, success: status.is_success(), status_code: status.as_u16(), error: error_message }));
         }
         Ok(None)
     }

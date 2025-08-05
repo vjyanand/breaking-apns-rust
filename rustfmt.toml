@@ -1,0 +1,22 @@
+# rustfmt.toml - Rust formatting configuration
+
+# Set maximum line width (default is 100)
+max_width = 200
+
+# Don't wrap function calls
+fn_call_width = 120
+
+# Don't wrap array elements
+array_width = 120
+
+# Don't wrap chain expressions (method calls)
+chain_width = 120
+
+# Don't wrap single line if expressions
+single_line_if_else_max_width = 120
+
+# Don't wrap struct literals
+struct_lit_width = 120
+
+# Don't wrap struct variant width
+struct_variant_width = 120

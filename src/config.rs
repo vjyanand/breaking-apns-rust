@@ -21,10 +21,7 @@ impl ApnsConfig {
 
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
-        let claims = Claims {
-            iss: self.team_id.clone(),
-            iat: now,
-        };
+        let claims = Claims { iss: self.team_id.clone(), iat: now };
 
         let mut header = Header::new(Algorithm::ES256);
         header.kid = Some(self.key_id.clone());
