@@ -1,5 +1,4 @@
 name: Rust
-
 on:
   push:
     branches: [ "master" ]
@@ -11,20 +10,25 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-    container: archlinux:latest
-
+    container: debian:latest
+    
     steps:
     - uses: actions/checkout@v4
+    
     - name: Install dependencies
       run: |
-        pacman -Syu --noconfirm
-        pacman -S --noconfirm rust cargo openssl pkgconf
+        apt-get update
+        apt-get install -y curl build-essential pkg-config libssl-dev
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        
     - name: Build
-      run: cargo build --release
+      run: |
+        export PATH="$HOME/.cargo/bin:$PATH"
+        cargo build --release
+        
     - name: Upload binary artifact
       uses: actions/upload-artifact@v4
       with:
         name: rust-binary
-        path: target/release/rust-breaking  # Replace with your actual binary name
+        path: target/release/rust-breaking
