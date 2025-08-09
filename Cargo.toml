@@ -1,6 +1,6 @@
 [package]
 name = "rust-breaking"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 
 [dependencies]
@@ -31,9 +31,9 @@ uuid = { version = "1.17.0", features = ["v4"] }
 name = "serverAPNS"
 path = "src/main.rs"
 
-[[bin]]
-name = "cli"
-path = "src/cli.rs"
+#[[bin]]
+#name = "cli"
+#path = "src/cli.rs"
 
 [profile.release]
 opt-level = 3       # Maximum optimization for performance

@@ -1,0 +1,6 @@
+# flyctl launch added from .gitignore
+target
+**/Cargo.lock
+**/.gitignore
+**/template
+fly.toml
