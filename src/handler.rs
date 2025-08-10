@@ -3,7 +3,7 @@ use actix_web::{HttpResponse, Responder, web};
 use log::warn;
 use sqlx::{Pool, Postgres};
 
-#[actix_web::get("/")]
+#[actix_web::get("/push/ios/breaking")]
 pub async fn push(config: web::Data<ApnsConfig>, query: web::Query<std::collections::HashMap<String, String>>) -> impl Responder {
     let news_id = match query.get("newsId") {
         Some(id) => match id.parse::<i64>() {
@@ -13,7 +13,6 @@ pub async fn push(config: web::Data<ApnsConfig>, query: web::Query<std::collecti
         None => return HttpResponse::BadRequest().body("Missing newsId"),
     };
     let device_hash = query.get("deviceHash");
-
     let client = match ApnsClient::new(&config) {
         Ok(client) => client,
         Err(e) => {
