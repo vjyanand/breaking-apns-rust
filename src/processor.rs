@@ -12,7 +12,7 @@ pub struct ApnsProcessor {
 
 impl ApnsProcessor {
     pub fn new(client: ApnsClient) -> Self {
-        Self { client: Arc::new(client), max_concurrent_requests: 6000 }
+        Self { client: Arc::new(client), max_concurrent_requests: 10000 }
     }
 
     pub async fn process_notifications(&self, pool: Pool<Postgres>, news_id: i64, device_hash: Option<&String>) {
