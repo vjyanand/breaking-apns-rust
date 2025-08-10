@@ -21,8 +21,10 @@ primary_region = 'sjc'
     handlers = ["http"]
     port = 9090
     force_https = false
+    [services.ports.http_options]
+      idle_timeout = 30
 
 [[vm]]
-  memory = '1gb'
+  memory = '512mb'
   cpu_kind = 'shared'
   cpus = 2

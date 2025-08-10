@@ -47,5 +47,7 @@ USER appuser
 # Expose port 9090
 EXPOSE 9090
 
+ENV RUST_LOG=INFO
+
 # Run the application
 CMD ["./app"]
