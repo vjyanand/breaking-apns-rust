@@ -19,7 +19,7 @@ impl ApnsProcessor {
                 clients.push(client);
             }
         }
-        Self { clients, max_concurrent_requests: 1000 }
+        Self { clients, max_concurrent_requests: 2000 }
     }
 
     pub async fn process_notifications(&self, pool: Pool<Postgres>, news_id: i64, device_hash: Option<&String>) {

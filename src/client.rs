@@ -28,8 +28,8 @@ impl ApnsClient {
             .pool_idle_timeout(Duration::from_secs(60))
             .pool_max_idle_per_host(2)
             .http2_only(true)
-            .http2_initial_stream_window_size(65_535) // Max stream window for HTTP/2
-            .http2_initial_connection_window_size(1_048_576) // 1MB connection window
+            .http2_initial_stream_window_size(131_072) // Max stream window for HTTP/2
+            .http2_initial_connection_window_size(2_097_152) // 1MB connection window
             .http2_adaptive_window(true)
             .build(https_connector);
 
