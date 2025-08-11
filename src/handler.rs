@@ -22,7 +22,7 @@ pub async fn push(config: web::Data<ApnsConfig>, query: web::Query<std::collecti
         }
     };
     warn!("Connected to Postgres {news_id}");
-    let processor = ApnsProcessor::new(&config, 10);
+    let processor = ApnsProcessor::new(&config, 20);
     processor.process_notifications(pool, news_id, device_hash).await;
     warn!("Finished processing notifications {news_id}");
     HttpResponse::Ok().body("Ok")

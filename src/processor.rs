@@ -37,8 +37,9 @@ impl ApnsProcessor {
         );
         let pool = Arc::new(pool);
         let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&*pool);
+        let concurrency_limit = self.max_concurrent_requests * (self.clients.len() / 2);
         stream
-            .for_each_concurrent(self.max_concurrent_requests, |notification| {
+            .for_each_concurrent(concurrency_limit, |notification| {
                 let clients = Arc::new(&self.clients);
                 let pool_ref = Arc::clone(&pool);
                 async move {
