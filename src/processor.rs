@@ -1,18 +1,25 @@
-use crate::apns::PushNotification;
 use crate::client::ApnsClient;
+use crate::{apns::PushNotification, config::ApnsConfig};
 use futures_util::StreamExt;
 use log::warn;
 use sqlx::{Pool, Postgres};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
 pub struct ApnsProcessor {
-    client: Arc<ApnsClient>,
+    clients: Vec<ApnsClient>,
     max_concurrent_requests: usize,
 }
 
 impl ApnsProcessor {
-    pub fn new(client: ApnsClient) -> Self {
-        Self { client: Arc::new(client), max_concurrent_requests: 4000 }
+    pub fn new(config: &ApnsConfig, num_clients: usize) -> Self {
+        let mut clients = Vec::with_capacity(num_clients);
+        for _ in 0..num_clients {
+            if let Ok(client) = ApnsClient::new(config) {
+                clients.push(client);
+            }
+        }
+        Self { clients, max_concurrent_requests: 1000 }
     }
 
     pub async fn process_notifications(&self, pool: Pool<Postgres>, news_id: i64, device_hash: Option<&String>) {
@@ -32,10 +39,15 @@ impl ApnsProcessor {
         let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&*pool);
         stream
             .for_each_concurrent(self.max_concurrent_requests, |notification| {
-                let client = Arc::clone(&self.client);
+                let clients = Arc::new(&self.clients);
                 let pool_ref = Arc::clone(&pool);
                 async move {
                     if let Ok(notification) = notification {
+                        let mut hasher = DefaultHasher::new();
+                        notification.device_token.hash(&mut hasher);
+                        let hash = hasher.finish();
+                        let index = (hash % clients.len() as u64) as usize;
+                        let client = &clients[index];
                         match client.send_notification(notification).await {
                             Ok(push_result) => {
                                 if let Some(result) = push_result {

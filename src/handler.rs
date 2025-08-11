@@ -1,4 +1,4 @@
-use crate::{client::ApnsClient, config::ApnsConfig, processor::ApnsProcessor};
+use crate::{config::ApnsConfig, processor::ApnsProcessor};
 use actix_web::{HttpResponse, Responder, web};
 use log::warn;
 use sqlx::{Pool, Postgres};
@@ -13,12 +13,7 @@ pub async fn push(config: web::Data<ApnsConfig>, query: web::Query<std::collecti
         None => return HttpResponse::BadRequest().body("Missing newsId"),
     };
     let device_hash = query.get("deviceHash");
-    let client = match ApnsClient::new(&config) {
-        Ok(client) => client,
-        Err(e) => {
-            return HttpResponse::InternalServerError().body(format!("Error creating client: {e}"));
-        }
-    };
+
     warn!("Connecting to Postgres {news_id}");
     let pool = match Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await {
         Ok(pool) => pool,
@@ -27,7 +22,7 @@ pub async fn push(config: web::Data<ApnsConfig>, query: web::Query<std::collecti
         }
     };
     warn!("Connected to Postgres {news_id}");
-    let processor = ApnsProcessor::new(client);
+    let processor = ApnsProcessor::new(&config, 4);
     processor.process_notifications(pool, news_id, device_hash).await;
     warn!("Finished processing notifications {news_id}");
     HttpResponse::Ok().body("Ok")
