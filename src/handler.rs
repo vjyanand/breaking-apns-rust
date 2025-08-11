@@ -35,5 +35,5 @@ pub async fn push(config: web::Data<ApnsConfig>, query: web::Query<std::collecti
 
 #[actix_web::get("/stats")]
 pub async fn ok() -> impl Responder {
-    HttpResponse::Ok().json(vec!["Nice to see the script up and running"])
+    HttpResponse::Ok().json(vec!["Nice to see the rust app up and running"])
 }
