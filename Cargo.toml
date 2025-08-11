@@ -24,7 +24,6 @@ sqlx = { version = "0.8.6", features = [
     "runtime-tokio",
 ] }
 tokio = { version = "1.47.1", features = ["full"] }
-tokio-stream = "0.1.17"
 uuid = { version = "1.17.0", features = ["v4"] }
 
 [[bin]]
