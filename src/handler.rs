@@ -22,10 +22,17 @@ pub async fn push(config: web::Data<ApnsConfig>, query: web::Query<std::collecti
         }
     };
     warn!("Connected to Postgres {news_id}");
-    let processor = ApnsProcessor::new(&config, 20);
-    processor.process_notifications(pool, news_id, device_hash).await;
-    warn!("Finished processing notifications {news_id}");
-    HttpResponse::Ok().body("Ok")
+    match ApnsProcessor::new(&config, 30) {
+        Ok(processor) => {
+            processor.process_notifications(pool, news_id, device_hash).await;
+            warn!("Finished processing notifications {news_id}");
+            HttpResponse::Ok().body("Ok")
+        }
+        Err(err) => {
+            warn!("Failed to create APNS processor: {err}");
+            HttpResponse::InternalServerError().body(format!("Failed to create APNS processor: {err}"))
+        }
+    }
 }
 
 #[actix_web::get("/stats")]

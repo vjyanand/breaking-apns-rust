@@ -1,3 +1,8 @@
+# fly.toml app configuration file generated for breaking-apns-rust on 2025-08-12T07:19:12+05:30
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
 app = 'breaking-apns-rust'
 primary_region = 'sjc'
 
@@ -5,7 +10,6 @@ primary_region = 'sjc'
 
 [http_service]
   internal_port = 9090
-  force_https = false
   auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
@@ -21,7 +25,7 @@ primary_region = 'sjc'
   [[services.ports]]
     port = 9090
     handlers = ['http']
-    force_https = false
+
     [services.ports.http_options]
       idle_timeout = 30
 

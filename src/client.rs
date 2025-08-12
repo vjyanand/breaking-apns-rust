@@ -21,7 +21,7 @@ pub struct ApnsClient {
 }
 
 impl ApnsClient {
-    pub fn new(config: &ApnsConfig) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn new(config: &ApnsConfig, jwt_token: &String) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let mut https_connector = HttpsConnector::new();
         https_connector.https_only(true);
         let client = LegacyClient::builder(TokioExecutor::new())
@@ -34,9 +34,7 @@ impl ApnsClient {
             .build(https_connector);
 
         let base_url = if config.sandbox { "https://api.sandbox.push.apple.com".to_string() } else { "https://api.push.apple.com".to_string() };
-
-        let jwt_token = config.generate_jwt()?;
-
+        let jwt_token = String::from(jwt_token);
         Ok(Self { client, base_url, jwt_token })
     }
 

@@ -51,8 +51,7 @@ pub enum BreakingApnsType {
     Complication,
 }
 
-// Use a more efficient lookup with perfect hash function or match
-const fn get_source_name(id: i64) -> &'static str {
+fn get_source_name<'a>(id: i64) -> &'a str {
     match id {
         1 => "CNN",
         2 => "WSJ",
@@ -135,7 +134,6 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
         let sound_id: i16 = row.try_get("sound_id")?;
         let news_id: i64 = row.try_get("news_id")?;
 
-        // Direct const lookup - no heap allocation
         let news_source = get_shared_news_source(news_id);
         let push_type: BreakingApnsType = row.try_get("type")?;
         let news_date: i64 = row.try_get("news_date")?;

@@ -1,4 +1,3 @@
-use log::warn;
 use sqlx::{Pool, Postgres};
 
 use crate::{client::ApnsClient, config::ApnsConfig, processor::ApnsProcessor};

@@ -12,14 +12,15 @@ pub struct ApnsProcessor {
 }
 
 impl ApnsProcessor {
-    pub fn new(config: &ApnsConfig, num_clients: usize) -> Self {
+    pub fn new(config: &ApnsConfig, num_clients: usize) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let mut clients = Vec::with_capacity(num_clients);
+        let jwt_token = config.generate_jwt()?;
         for _ in 0..num_clients {
-            if let Ok(client) = ApnsClient::new(config) {
+            if let Ok(client) = ApnsClient::new(config, &jwt_token) {
                 clients.push(client);
             }
         }
-        Self { clients, max_concurrent_requests: 2000 }
+        Ok(Self { clients, max_concurrent_requests: 2000 })
     }
 
     pub async fn process_notifications(&self, pool: Pool<Postgres>, news_id: i64, device_hash: Option<&String>) {
