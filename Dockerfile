@@ -53,6 +53,6 @@ ENV PORT=9090
 ENV RUST_LOG=INFO
 
 # Run the application
-CMD ["./app"]
+CMD ["heaptrack", "/app/app"]
 
 #apt-get update && apt-get install -y heaptrack procps gdb 
