@@ -40,7 +40,7 @@ COPY --from=builder /app/target/release/serverAPNS ./app
 COPY key.p8 /app
 
 # Change ownership to the non-root user
-RUN chown appuser:appuser ./app
+RUN chown -R appuser:appuser /app
 
 # Switch to the non-root user
 USER appuser
