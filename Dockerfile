@@ -26,7 +26,7 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y heaptrack procps gdb 
+#RUN apt-get update && apt-get install -y heaptrack procps gdb 
     
 # Create a non-root user
 RUN useradd -r -s /bin/false appuser
@@ -49,10 +49,10 @@ USER appuser
 EXPOSE 9090
 
 ENV PORT=9090
-
 ENV RUST_LOG=INFO
 
 # Run the application
-CMD ["heaptrack", "/app/app"]
+CMD ["/app/app"]
+#CMD ["heaptrack", "/app/app"]
 
 #apt-get update && apt-get install -y heaptrack procps gdb 
