@@ -23,8 +23,7 @@ RUN touch src/main.rs && cargo build --release
 FROM debian:bookworm-slim
 
 # Install necessary runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates heaptrack procps gdb \
+RUN apt-get update && apt-get install -y ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
@@ -53,3 +52,5 @@ ENV RUST_LOG=INFO
 
 # Run the application
 CMD ["./app"]
+
+#apt-get update && apt-get install -y heaptrack procps gdb 
