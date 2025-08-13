@@ -4,5 +4,6 @@ GET http://localhost:9090/push/ios/breaking?newsId=387933&deviceHash=AF2DA8D0-A5
 
 GET http://localhost:9090/stats
 
+###
 
-##cargo flamegraph   --bin rust-breaking --no-inline --skip-after "std::" --skip-after "core::" --skip-after "alloc::" --skip-after "__rust" --skip-after "rustc_" --deterministic
+GET https://breaking.apns.iavian.net/push/ios/breaking?newsId=404039
