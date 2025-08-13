@@ -4,7 +4,7 @@ use log::warn;
 use sqlx::{Pool, Postgres};
 
 #[actix_web::get("/push/ios/breaking")]
-pub async fn push(config: web::Data<ApnsConfig>, query: web::Query<std::collections::HashMap<String, String>>) -> impl Responder {
+pub async fn push(query: web::Query<std::collections::HashMap<String, String>>) -> impl Responder {
     let news_id = match query.get("newsId") {
         Some(id) => match id.parse::<i64>() {
             Ok(id) => id,
@@ -12,18 +12,25 @@ pub async fn push(config: web::Data<ApnsConfig>, query: web::Query<std::collecti
         },
         None => return HttpResponse::BadRequest().body("Missing newsId"),
     };
-    let device_hash = query.get("deviceHash");
-
-    warn!("Connecting to Postgres {news_id}");
-    let pool = match Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await {
-        Ok(pool) => pool,
+    let private_key = match std::fs::read_to_string("key.p8") {
+        Ok(private_key) => private_key,
         Err(e) => {
-            return HttpResponse::InternalServerError().body(format!("Error creating client: {e}"));
+            warn!("Error getting config: {e}");
+            return HttpResponse::InternalServerError().body(format!("Error getting config: {e}"));
         }
     };
-    warn!("Connected to Postgres {news_id}");
+    let config = ApnsConfig { key_id: "9F437T6Y4G".to_string(), team_id: "JX83D66C47".to_string(), private_key, sandbox: false };
     match ApnsProcessor::new(&config, 30) {
         Ok(processor) => {
+            let device_hash = query.get("deviceHash");
+            warn!("Connecting to Postgres {news_id}");
+            let pool = match Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await {
+                Ok(pool) => pool,
+                Err(e) => {
+                    return HttpResponse::InternalServerError().body(format!("Error creating client: {e}"));
+                }
+            };
+            warn!("Connected to Postgres {news_id}");
             processor.process_notifications(pool, news_id, device_hash).await;
             warn!("Finished processing notifications {news_id}");
             HttpResponse::Ok().body("Ok")
