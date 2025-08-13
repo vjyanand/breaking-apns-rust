@@ -6,11 +6,9 @@ mod processor;
 use std::env;
 
 use actix_web::middleware::{self, Logger};
-use actix_web::web::Data;
 use actix_web::{App, HttpServer};
 use log::warn;
 
-use crate::config::ApnsConfig;
 use crate::handler::ok;
 use crate::handler::push;
 #[tokio::main]
@@ -25,16 +23,8 @@ async fn main() -> std::io::Result<()> {
 
     warn!("Starting APNs server at {binding_interface}");
 
-    let config = ApnsConfig {
-        key_id: "9F437T6Y4G".to_string(),
-        team_id: "JX83D66C47".to_string(),
-        private_key: std::fs::read_to_string("key.p8")?,
-        sandbox: false,
-    };
-
     HttpServer::new(move || {
         App::new()
-            .app_data(Data::new(config.clone()))
             .wrap(Logger::default())
             .wrap(middleware::DefaultHeaders::new().add(("X-Version", env!("CARGO_PKG_VERSION"))))
             .service(ok)
