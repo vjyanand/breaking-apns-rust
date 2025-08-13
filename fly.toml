@@ -17,12 +17,15 @@ primary_region = 'sjc'
   auto_stop_machines = 'stop'
   auto_start_machines = true
   force_https = true
+  soft_limit = 1
+  hard_limit = 2
   min_machines_running = 0
 
   [[services.ports]]
     port = 9090
     handlers = ['http']
-
+    soft_limit = 1
+    hard_limit = 2
     [services.ports.http_options]
       idle_timeout = 30
 
