@@ -1,17 +1,17 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{Map, Value};
 use sqlx::{FromRow, Row, Type};
 use std::{borrow::Cow, sync::OnceLock};
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct ApnsPayload {
     pub aps: ApsPayload,
     #[serde(flatten)]
     pub custom: Map<String, Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize)]
 pub struct ApsPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alert: Option<AlertPayload>,
@@ -23,7 +23,7 @@ pub struct ApsPayload {
     pub content_available: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct AlertPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<Cow<'static, str>>,
@@ -43,7 +43,7 @@ pub struct PushNotification {
     pub payload: ApnsPayload,
 }
 
-#[derive(Debug, Type, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Type, Serialize, PartialEq)]
 #[sqlx(type_name = "breaking_apns_type", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum BreakingApnsType {
     App,
@@ -51,7 +51,7 @@ pub enum BreakingApnsType {
     Complication,
 }
 
-fn get_source_name<'a>(id: i64) -> &'a str {
+fn get_source_name(id: i64) -> &'static str {
     match id {
         1 => "CNN",
         2 => "WSJ",
@@ -161,13 +161,7 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
         custom.insert("t".into(), Value::Number(news_date.into()));
 
         let url: String = row.try_get("url")?;
-        let url_value = if url.len() < 3 {
-            // Use format! only when necessary, pre-allocate capacity
-            Value::String(format!("https://breaking.iavian.net/article/{news_id}"))
-        } else {
-            Value::String(url)
-        };
-        custom.insert("_u".into(), url_value);
+        custom.insert("_u".into(), Value::String(url));
 
         let payload = ApnsPayload { aps, custom };
         let collapse_id = Some(Cow::Borrowed(news_source));

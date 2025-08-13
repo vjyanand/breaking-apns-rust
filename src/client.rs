@@ -13,7 +13,6 @@ use crate::apns::PushNotification;
 use crate::apns::PushResult;
 use crate::config::ApnsConfig;
 
-#[derive(Debug, Clone)]
 pub struct ApnsClient {
     client: LegacyClient<HttpsConnector<HttpConnector>, Full<Bytes>>,
     base_url: String,
