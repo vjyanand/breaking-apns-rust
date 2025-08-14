@@ -30,6 +30,6 @@ primary_region = 'sjc'
       idle_timeout = 30
 
 [[vm]]
-  memory = '1024mb'
+  memory = '2048mb'
   cpu_kind = 'shared'
   cpus = 1
