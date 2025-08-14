@@ -7,14 +7,9 @@ use std::env;
 
 use actix_web::middleware::{self, Logger};
 use actix_web::{App, HttpServer};
-use jemallocator::Jemalloc;
 use log::warn;
 
-use crate::handler::ok;
-use crate::handler::push;
-
-#[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
+use crate::handler::{ok, push};
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
