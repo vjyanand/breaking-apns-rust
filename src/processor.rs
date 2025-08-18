@@ -51,7 +51,7 @@ impl ApnsProcessor {
                         let hash = hasher.finish();
                         let index = (hash % clients.len() as u64) as usize;
                         let client = &clients[index];
-                        match client.send_notification(notification).await {
+                        match client.send_notification(&notification).await {
                             Ok(push_result) => {
                                 if let Some(result) = push_result {
                                     if !result.success && result.status_code == 410 {

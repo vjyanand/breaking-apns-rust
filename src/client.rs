@@ -37,7 +37,7 @@ impl ApnsClient {
         Ok(Self { client, base_url, jwt_token })
     }
 
-    pub async fn send_notification(&self, notification: PushNotification) -> Result<Option<PushResult>, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn send_notification(&self, notification: &PushNotification) -> Result<Option<PushResult>, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/3/device/{}", self.base_url, notification.device_token);
         let uri: Uri = url.parse().unwrap();
         let payload = serde_json::to_string(&notification.payload).unwrap();
@@ -87,10 +87,8 @@ impl ApnsClient {
             let apns_id = Uuid::parse_str(&apns_id_header);
             let body_bytes = response.collect().await?.to_bytes();
             let error_message = String::from_utf8_lossy(&body_bytes).to_string();
-            drop(notification);
             return Ok(Some(PushResult { apns_id, success: status.is_success(), status_code: status.as_u16(), error: error_message }));
         }
-        drop(notification);
         Ok(None)
     }
 }
