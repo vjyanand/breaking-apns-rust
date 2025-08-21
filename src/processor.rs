@@ -5,9 +5,11 @@ use log::warn;
 use sqlx::{Pool, Postgres};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 pub struct ApnsProcessor {
     clients: Vec<ApnsClient>,
+    semaphore: Arc<Semaphore>,
 }
 
 impl ApnsProcessor {
@@ -19,7 +21,8 @@ impl ApnsProcessor {
                 clients.push(client);
             }
         }
-        Ok(Self { clients })
+        let semaphore = Arc::new(Semaphore::new(8000));
+        Ok(Self { clients, semaphore })
     }
 
     pub async fn process_notifications(&self, pool: Pool<Postgres>, news_id: i64, device_hash: Option<&String>) {
@@ -38,10 +41,10 @@ impl ApnsProcessor {
 
         let pool = Arc::new(pool);
         let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&*pool);
-        let concurrency_limit = 4000;
         stream
-            .for_each_concurrent(concurrency_limit, |notification| {
+            .for_each_concurrent(None, |notification| {
                 let pool_ref = Arc::clone(&pool);
+                let semaphore = Arc::clone(&self.semaphore);
                 async move {
                     if let Ok(notification) = notification {
                         let mut hasher = DefaultHasher::new();
@@ -49,6 +52,7 @@ impl ApnsProcessor {
                         let hash = hasher.finish();
                         let index = (hash % self.clients.len() as u64) as usize;
                         let client = &self.clients[index];
+                        let _permit = semaphore.acquire().await.unwrap();
                         match client.send_notification(&notification).await {
                             Ok(push_result) => {
                                 if let Some(result) = push_result {
