@@ -20,7 +20,7 @@ pub async fn push(query: web::Query<std::collections::HashMap<String, String>>) 
         }
     };
     let config = ApnsConfig { key_id: "9F437T6Y4G".to_string(), team_id: "JX83D66C47".to_string(), private_key, sandbox: false };
-    match ApnsProcessor::new(&config, 80) {
+    match ApnsProcessor::new(&config, 40) {
         Ok(processor) => {
             let device_hash = query.get("deviceHash");
             warn!("Connecting to Postgres {news_id}");
