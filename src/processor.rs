@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 pub struct ApnsProcessor {
     clients: Vec<ApnsClient>,
-    max_concurrent_requests: usize,
 }
 
 impl ApnsProcessor {
@@ -20,7 +19,7 @@ impl ApnsProcessor {
                 clients.push(client);
             }
         }
-        Ok(Self { clients, max_concurrent_requests: 4000 })
+        Ok(Self { clients })
     }
 
     pub async fn process_notifications(&self, pool: Pool<Postgres>, news_id: i64, device_hash: Option<&String>) {
@@ -39,7 +38,7 @@ impl ApnsProcessor {
 
         let pool = Arc::new(pool);
         let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&*pool);
-        let concurrency_limit = self.max_concurrent_requests * (self.clients.len() / 2);
+        let concurrency_limit = 4000;
         stream
             .for_each_concurrent(concurrency_limit, |notification| {
                 let pool_ref = Arc::clone(&pool);
