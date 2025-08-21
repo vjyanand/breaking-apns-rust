@@ -21,7 +21,7 @@ impl ApnsProcessor {
                 clients.push(client);
             }
         }
-        let semaphore = Arc::new(Semaphore::new(10000));
+        let semaphore = Arc::new(Semaphore::new(8000));
         Ok(Self { clients, semaphore })
     }
 
