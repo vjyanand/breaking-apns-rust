@@ -32,6 +32,7 @@ pub async fn push(query: web::Query<std::collections::HashMap<String, String>>) 
             };
             warn!("Connected to Postgres {news_id}");
             processor.process_notifications(pool, news_id, device_hash).await;
+            drop(processor);
             warn!("Finished processing notifications {news_id}");
             HttpResponse::Ok().body("Ok")
         }

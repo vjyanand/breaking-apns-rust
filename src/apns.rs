@@ -181,7 +181,6 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
 #[derive(Debug)]
 pub struct PushResult {
     pub apns_id: Result<Uuid, uuid::Error>,
-    pub success: bool,
     pub status_code: u16,
     pub error: String,
 }

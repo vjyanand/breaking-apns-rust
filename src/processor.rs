@@ -42,15 +42,14 @@ impl ApnsProcessor {
         let concurrency_limit = self.max_concurrent_requests * (self.clients.len() / 2);
         stream
             .for_each_concurrent(concurrency_limit, |notification| {
-                let clients = Arc::new(&self.clients);
                 let pool_ref = Arc::clone(&pool);
                 async move {
                     if let Ok(notification) = notification {
                         let mut hasher = DefaultHasher::new();
                         notification.device_token.hash(&mut hasher);
                         let hash = hasher.finish();
-                        let index = (hash % clients.len() as u64) as usize;
-                        let client = &clients[index];
+                        let index = (hash % self.clients.len() as u64) as usize;
+                        let client = &self.clients[index];
                         match client.send_notification(&notification).await {
                             Ok(push_result) => {
                                 if let Some(result) = push_result {
@@ -73,7 +72,6 @@ impl ApnsProcessor {
                             }
                         }
                     }
-                    drop(clients);
                     drop(pool_ref);
                 }
             })

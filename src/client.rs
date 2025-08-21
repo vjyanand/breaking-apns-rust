@@ -87,7 +87,7 @@ impl ApnsClient {
             let apns_id = Uuid::parse_str(&apns_id_header);
             let body_bytes = response.collect().await?.to_bytes();
             let error_message = String::from_utf8_lossy(&body_bytes).to_string();
-            return Ok(Some(PushResult { apns_id, success: status.is_success(), status_code: status.as_u16(), error: error_message }));
+            return Ok(Some(PushResult { apns_id, status_code: status.as_u16(), error: error_message }));
         }
         Ok(None)
     }
