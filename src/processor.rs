@@ -30,8 +30,8 @@ impl ApnsProcessor {
         }
         let sql = format!(
             "SELECT CASE WHEN LENGTH(COALESCE(nm.url, '')) < 3 THEN CONCAT('https://breaking.iavian.net/article/', nm.id)::TEXT ELSE url END AS url, dm.id, nm.id AS nId, dm.devicehash, dm.token, dm.sound_id, trim(nm.text) AS text, \
-            (case when _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' then ((_from, _to) OVERLAPS (current_time, current_time)) \
-            else (case when _from <= current_time OR _to >= current_time then true else false end) end) AS playsound, \
+            (case WHEN _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' THEN ((_from, _to) OVERLAPS (current_time, current_time)) \
+            ELSE (case WHEN _from <= current_time OR _to >= current_time THEN true ELSE false END) END) AS playsound, \
             dm.paid, extract(epoch from nm.news_date)::BIGINT AS news_date, dm.type, nm.news_id \
             FROM apns_master dm, news_master nm \
             WHERE (dm.news_id & nm.news_id = nm.news_id) AND {device_hash_filter} nm.id = $1"
