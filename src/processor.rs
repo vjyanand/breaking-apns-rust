@@ -20,7 +20,7 @@ impl ApnsProcessor {
                 clients.push(client);
             }
         }
-        Ok(Self { clients, max_concurrent_requests: 2000 })
+        Ok(Self { clients, max_concurrent_requests: 4000 })
     }
 
     pub async fn process_notifications(&self, pool: Pool<Postgres>, news_id: i64, device_hash: Option<&String>) {
@@ -54,16 +54,16 @@ impl ApnsProcessor {
                         match client.send_notification(&notification).await {
                             Ok(push_result) => {
                                 if let Some(result) = push_result {
-                                    if !result.success && result.status_code == 410 {
+                                    if result.status_code == 410 {
                                         if let Ok(apns_id) = result.apns_id {
-                                            warn!("DB-UPDATE-APNS_FAIL: ID={}, Status={}, Error={:?}", apns_id, result.status_code, result.error);
+                                            warn!("DB-UPDATE-APNS-FAIL: ID={}, Status={}, Error={:?}", apns_id, result.status_code, result.error);
                                             if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(apns_id).execute(&*pool_ref).await {
                                                 warn!("Failed to update APNS notification: {err}");
                                             }
                                         } else {
                                             warn!("Failed to parse APNS notification: {result:?}");
                                         }
-                                    } else if !result.success {
+                                    } else {
                                         warn!("APNS notification send error: {result:?}");
                                     }
                                 }
