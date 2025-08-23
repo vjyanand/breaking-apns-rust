@@ -5,32 +5,28 @@ mod handler;
 mod processor;
 use std::env;
 
-use actix_web::middleware::{self, Logger};
-use actix_web::{App, HttpServer};
 use log::warn;
-
-use crate::handler::{ok, push};
+use warp::Filter;
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
+async fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
         .format_timestamp_secs() // Include timestamps in seconds
         .init();
 
     let port: u16 = env::var("PORT").unwrap_or_else(|_| String::from("9090")).parse().expect("PORT must be a number");
 
-    let binding_interface = format!("0.0.0.0:{port}");
+    let stats = warp::path("stats").and(warp::get()).and_then(handler::ok);
 
-    warn!("Starting APNs server at {binding_interface}");
+    let push = warp::path!("push" / "ios" / "breaking")
+        .and(warp::get())
+        .and(warp::query::<std::collections::HashMap<String, String>>())
+        .and_then(handler::push);
 
-    HttpServer::new(move || {
-        App::new()
-            .wrap(Logger::default())
-            .wrap(middleware::DefaultHeaders::new().add(("X-Version", env!("CARGO_PKG_VERSION"))))
-            .service(ok)
-            .service(push)
-    })
-    .bind(binding_interface)?
-    .run()
-    .await
+    // Combine routes with middleware
+    let routes = stats.or(push).with(warp::log("apns_server")).with(warp::reply::with::header("X-Version", env!("CARGO_PKG_VERSION")));
+
+    warn!("Starting APNs server at 0.0.0.0:{port}");
+
+    warp::serve(routes).run(([0, 0, 0, 0], port)).await;
 }
