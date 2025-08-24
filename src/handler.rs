@@ -54,5 +54,5 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
 }
 
 pub async fn ok() -> Result<impl Reply, Infallible> {
-    Ok(warp::reply::json(&vec!["Nice to see the RUST app up and running"]))
+    Ok(warp::reply::json(&vec!["Nice to see the RUST WARP app up and running"]))
 }
