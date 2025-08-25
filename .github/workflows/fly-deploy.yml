@@ -5,9 +5,10 @@ on:
   push:
     branches:
       - master
+      - warp
 jobs:
   deploy:
-    name: Deploy app
+    name: Deploy APNS app
     runs-on: ubuntu-latest
     concurrency: deploy-group    # optional: ensure only one action runs at a time
     steps:
