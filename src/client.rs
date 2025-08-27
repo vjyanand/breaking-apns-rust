@@ -74,7 +74,7 @@ impl ApnsClient {
         request = request.header("apns-id", &notification.id.to_string());
 
         let request = request.body(Full::new(Bytes::from(payload)))?;
-        /*let response = self.client.request(request).await?;
+        let response = self.client.request(request).await?;
         let status = response.status();
 
         if !status.is_success() {
@@ -88,7 +88,7 @@ impl ApnsClient {
             let body_bytes = response.collect().await?.to_bytes();
             let error_message = String::from_utf8_lossy(&body_bytes).to_string();
             return Ok(Some(PushResult { apns_id, status_code: status.as_u16(), error: error_message }));
-        }*/
+        }
         Ok(None)
     }
 }

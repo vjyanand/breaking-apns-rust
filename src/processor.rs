@@ -4,7 +4,6 @@ use futures_util::StreamExt;
 use log::warn;
 use sqlx::{Pool, Postgres};
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::sync::Arc;
 
 pub struct ApnsProcessor {
     clients: Vec<ApnsClient>,
