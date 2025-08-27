@@ -46,7 +46,27 @@ impl ApnsProcessor {
                     let hash = hasher.finish();
                     let index = (hash % self.clients.len() as u64) as usize;
                     let client = &self.clients[index];
-                    
+                    match client.send_notification(&notification).await {
+                        Ok(push_result) => {
+                            if let Some(result) = push_result {
+                                if result.status_code == 410 {
+                                    if let Ok(apns_id) = result.apns_id {
+                                        warn!("DB-UPDATE-APNS-FAIL: ID={}, Status={}, Error={:?}", apns_id, result.status_code, result.error);
+                                        if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(apns_id).execute(&self.pool).await {
+                                            warn!("Failed to update APNS notification: {err}");
+                                        }
+                                    } else {
+                                        warn!("Failed to parse APNS notification: {result:?}");
+                                    }
+                                } else {
+                                    warn!("APNS notification send error: {result:?}");
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            warn!("Error sending notification: {err}");
+                        }
+                    }
                 }
             })
             .await;
