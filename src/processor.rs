@@ -38,45 +38,38 @@ impl ApnsProcessor {
             WHERE (dm.news_id & nm.news_id = nm.news_id) AND {device_hash_filter} nm.id = $1"
         );
 
-        let pool = Arc::new(&self.pool);
-        let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(*pool);
+        let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&self.pool);
         stream
-            .for_each_concurrent(Some(self.clients.len()), |notification| {
-                let pool_ref = Arc::clone(&pool);
-                async move {
-                    if let Ok(notification) = notification {
-                        let mut hasher = DefaultHasher::new();
-                        notification.device_token.hash(&mut hasher);
-                        let hash = hasher.finish();
-                        let index = (hash % self.clients.len() as u64) as usize;
-                        let client = &self.clients[index];
-                        match client.send_notification(&notification).await {
-                            Ok(push_result) => {
-                                if let Some(result) = push_result {
-                                    if result.status_code == 410 {
-                                        if let Ok(apns_id) = result.apns_id {
-                                            warn!("DB-UPDATE-APNS-FAIL: ID={}, Status={}, Error={:?}", apns_id, result.status_code, result.error);
-                                            if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(apns_id).execute(*pool_ref).await {
-                                                warn!("Failed to update APNS notification: {err}");
-                                            }
-                                        } else {
-                                            warn!("Failed to parse APNS notification: {result:?}");
+            .for_each_concurrent(Some(self.clients.len()), |notification| async move {
+                if let Ok(notification) = notification {
+                    let mut hasher = DefaultHasher::new();
+                    notification.device_token.hash(&mut hasher);
+                    let hash = hasher.finish();
+                    let index = (hash % self.clients.len() as u64) as usize;
+                    let client = &self.clients[index];
+                    match client.send_notification(&notification).await {
+                        Ok(push_result) => {
+                            if let Some(result) = push_result {
+                                if result.status_code == 410 {
+                                    if let Ok(apns_id) = result.apns_id {
+                                        warn!("DB-UPDATE-APNS-FAIL: ID={}, Status={}, Error={:?}", apns_id, result.status_code, result.error);
+                                        if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(apns_id).execute(&self.pool).await {
+                                            warn!("Failed to update APNS notification: {err}");
                                         }
                                     } else {
-                                        warn!("APNS notification send error: {result:?}");
+                                        warn!("Failed to parse APNS notification: {result:?}");
                                     }
+                                } else {
+                                    warn!("APNS notification send error: {result:?}");
                                 }
                             }
-                            Err(err) => {
-                                warn!("Error sending notification: {err}");
-                            }
+                        }
+                        Err(err) => {
+                            warn!("Error sending notification: {err}");
                         }
                     }
-                    drop(pool_ref);
                 }
             })
             .await;
-        pool.close().await;
-        drop(pool);
     }
 }
