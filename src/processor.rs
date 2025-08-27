@@ -5,15 +5,14 @@ use log::warn;
 use sqlx::{Pool, Postgres};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
-use tokio::sync::Semaphore;
 
 pub struct ApnsProcessor {
     clients: Vec<ApnsClient>,
-    semaphore: Arc<Semaphore>,
+    pool: Pool<Postgres>,
 }
 
 impl ApnsProcessor {
-    pub fn new(config: &ApnsConfig, num_clients: usize) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn new(config: &ApnsConfig, num_clients: usize) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let mut clients = Vec::with_capacity(num_clients);
         let jwt_token = config.generate_jwt()?;
         for _ in 0..num_clients {
@@ -21,11 +20,11 @@ impl ApnsProcessor {
                 clients.push(client);
             }
         }
-        let semaphore = Arc::new(Semaphore::new(10000));
-        Ok(Self { clients, semaphore })
+        let pool = Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await?;
+        Ok(Self { clients, pool })
     }
 
-    pub async fn process_notifications(&self, pool: Pool<Postgres>, news_id: i64, device_hash: Option<&String>) {
+    pub async fn process_notifications(&self, news_id: i64, device_hash: Option<&String>) {
         let mut device_hash_filter = String::new();
         if let Some(device_hash) = device_hash {
             device_hash_filter = format!("dm.devicehash = '{device_hash}' AND");
@@ -39,12 +38,11 @@ impl ApnsProcessor {
             WHERE (dm.news_id & nm.news_id = nm.news_id) AND {device_hash_filter} nm.id = $1"
         );
 
-        let pool = Arc::new(pool);
-        let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&*pool);
+        let pool = Arc::new(&self.pool);
+        let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(*pool);
         stream
-            .for_each_concurrent(None, |notification| {
+            .for_each_concurrent(Some(self.clients.len()), |notification| {
                 let pool_ref = Arc::clone(&pool);
-                let semaphore = Arc::clone(&self.semaphore);
                 async move {
                     if let Ok(notification) = notification {
                         let mut hasher = DefaultHasher::new();
@@ -52,14 +50,13 @@ impl ApnsProcessor {
                         let hash = hasher.finish();
                         let index = (hash % self.clients.len() as u64) as usize;
                         let client = &self.clients[index];
-                        let _permit = semaphore.acquire().await.unwrap();
                         match client.send_notification(&notification).await {
                             Ok(push_result) => {
                                 if let Some(result) = push_result {
                                     if result.status_code == 410 {
                                         if let Ok(apns_id) = result.apns_id {
                                             warn!("DB-UPDATE-APNS-FAIL: ID={}, Status={}, Error={:?}", apns_id, result.status_code, result.error);
-                                            if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(apns_id).execute(&*pool_ref).await {
+                                            if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(apns_id).execute(*pool_ref).await {
                                                 warn!("Failed to update APNS notification: {err}");
                                             }
                                         } else {
