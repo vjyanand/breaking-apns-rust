@@ -15,11 +15,11 @@ impl ApnsProcessor {
     pub async fn new(config: &ApnsConfig, num_clients: usize) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let mut clients = Vec::with_capacity(num_clients);
         let jwt_token = config.generate_jwt()?;
-        for _ in 0..num_clients {
-            if let Ok(client) = ApnsClient::new(config, &jwt_token) {
-                clients.push(client);
-            }
-        }
+        // for _ in 0..num_clients {
+        //     if let Ok(client) = ApnsClient::new(config, &jwt_token) {
+        //         clients.push(client);
+        //     }
+        // }
         Ok(Self { clients })
     }
 
