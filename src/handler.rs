@@ -24,19 +24,7 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
 
     let config = ApnsConfig { key_id: "9F437T6Y4G".to_string(), team_id: "JX83D66C47".to_string(), private_key, sandbox: false };
 
-    match ApnsProcessor::new(&config, 50).await {
-        Ok(processor) => {
-            let device_hash = query.get("deviceHash");
-            //processor.process_notifications(news_id, device_hash).await;
-            warn!("Finished processing notifications {news_id}");
-            Ok(Box::new(warp::reply::with_status("Ok", warp::http::StatusCode::OK)))
-        }
-        Err(err) => {
-            warn!("Failed to create APNS processor: {err}");
-            let error_msg = format!("Failed to create APNS processor: {err}");
-            Ok(Box::new(warp::reply::with_status(error_msg, warp::http::StatusCode::INTERNAL_SERVER_ERROR)))
-        }
-    }
+    Ok(Box::new(warp::reply::with_status("Ok", warp::http::StatusCode::OK)))
 }
 
 pub async fn ok() -> Result<impl Reply, Infallible> {
