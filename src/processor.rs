@@ -3,13 +3,12 @@ use crate::{apns::PushNotification, config::ApnsConfig};
 use futures_util::StreamExt;
 use log::warn;
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{Pool, Postgres};
+use sqlx::{Connection, PgConnection, Pool, Postgres};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::Duration;
 
 pub struct ApnsProcessor {
     clients: Vec<ApnsClient>,
-    pub pool: Pool<Postgres>,
 }
 
 impl ApnsProcessor {
@@ -21,15 +20,8 @@ impl ApnsProcessor {
                 clients.push(client);
             }
         }
-        let pool = PgPoolOptions::new()
-            .max_connections(3)
-            .min_connections(1)
-            .idle_timeout(Duration::from_secs(60))
-            .max_lifetime(Duration::from_secs(400))
-            .connect("postgres://breaking:qwertY123@db.iavian.net/breaking")
-            .await?;
 
-        Ok(Self { clients, pool })
+        Ok(Self { clients })
     }
 
     pub async fn process_notifications(&self, news_id: i64, device_hash: Option<&String>) {
@@ -45,8 +37,9 @@ impl ApnsProcessor {
             FROM apns_master dm, news_master nm \
             WHERE (dm.news_id & nm.news_id = nm.news_id) AND {device_hash_filter} nm.id = $1"
         );
-
-        let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&self.pool);
-        stream.for_each(|notification| async move { if let Ok(notification) = notification {} }).await;
+        if let Ok(mut connection) = PgConnection::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await {
+            let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&mut connection);
+            stream.for_each(|notification| async move { if let Ok(notification) = notification {} }).await;
+        }
     }
 }
