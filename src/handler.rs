@@ -27,8 +27,7 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
     if let Ok(processor) = ApnsProcessor::new(&config, 50).await {
         drop(processor);
     }
-
-    Ok(Box::new(warp::reply::with_status("Ok", warp::http::StatusCode::OK)))
+    Ok(Box::new(warp::reply::with_status("Ok1", warp::http::StatusCode::OK)))
 }
 
 pub async fn ok() -> Result<impl Reply, Infallible> {
