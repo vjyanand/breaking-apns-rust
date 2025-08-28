@@ -2,6 +2,7 @@ use std::{collections::HashMap, convert::Infallible};
 
 use crate::{config::ApnsConfig, processor::ApnsProcessor};
 use log::warn;
+use sysinfo::{ProcessesToUpdate, System};
 use warp::{reject::Rejection, reply::Reply};
 
 pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Rejection> {
@@ -23,11 +24,13 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
     };
 
     let config = ApnsConfig { key_id: "9F437T6Y4G".to_string(), team_id: "JX83D66C47".to_string(), private_key, sandbox: false };
-    let processor = ApnsProcessor::new(&config, 50).await;
-    
+    if let Ok(processor) = ApnsProcessor::new(&config, 50).await {
+        processor.pool.close().await;
+    }
+
     Ok(Box::new(warp::reply::with_status("Ok", warp::http::StatusCode::OK)))
 }
 
 pub async fn ok() -> Result<impl Reply, Infallible> {
-    Ok(warp::reply::json(&vec!["Nice to see the Test2 Rust WARP app up and running"]))
+    Ok(warp::reply::json(&vec!["Nice to see the Test3 Rust WARP app up and running"]))
 }

@@ -9,7 +9,7 @@ use std::time::Duration;
 
 pub struct ApnsProcessor {
     clients: Vec<ApnsClient>,
-    pool: Pool<Postgres>,
+    pub pool: Pool<Postgres>,
 }
 
 impl ApnsProcessor {

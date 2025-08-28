@@ -4,6 +4,9 @@ GET http://localhost:9090/push/ios/breaking?newsId=387933&deviceHash=AF2DA8D0-A5
 GET http://localhost:9090/stats
 
 ###
+GET http://localhost:9090/push/ios/breaking?newsId=404147
+
+###
 GET https://test.breaking.apns.iavian.net/stats
 
 ###
