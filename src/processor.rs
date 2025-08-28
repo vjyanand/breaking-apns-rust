@@ -20,7 +20,6 @@ impl ApnsProcessor {
                 clients.push(client);
             }
         }
-
         Ok(Self { clients })
     }
 
