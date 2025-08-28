@@ -27,10 +27,8 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
     match ApnsProcessor::new(&config, 50).await {
         Ok(processor) => {
             let device_hash = query.get("deviceHash");
-            processor.process_notifications(news_id, device_hash).await;
-            drop(processor);
+            //processor.process_notifications(news_id, device_hash).await;
             warn!("Finished processing notifications {news_id}");
-
             Ok(Box::new(warp::reply::with_status("Ok", warp::http::StatusCode::OK)))
         }
         Err(err) => {
