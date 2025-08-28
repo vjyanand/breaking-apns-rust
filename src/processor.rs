@@ -2,8 +2,10 @@ use crate::client::ApnsClient;
 use crate::{apns::PushNotification, config::ApnsConfig};
 use futures_util::StreamExt;
 use log::warn;
+use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::time::Duration;
 
 pub struct ApnsProcessor {
     clients: Vec<ApnsClient>,
@@ -19,7 +21,14 @@ impl ApnsProcessor {
                 clients.push(client);
             }
         }
-        let pool = Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await?;
+        let pool = PgPoolOptions::new()
+            .max_connections(3)
+            .min_connections(1)
+            .idle_timeout(Duration::from_secs(60))
+            .max_lifetime(Duration::from_secs(400))
+            .connect("postgres://breaking:qwertY123@db.iavian.net/breaking")
+            .await?;
+
         Ok(Self { clients, pool })
     }
 
