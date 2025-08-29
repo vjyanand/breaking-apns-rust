@@ -2,7 +2,6 @@ use std::{collections::HashMap, convert::Infallible};
 
 use crate::{config::ApnsConfig, processor::ApnsProcessor};
 use log::warn;
-use sysinfo::{ProcessesToUpdate, System};
 use warp::{reject::Rejection, reply::Reply};
 
 pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Rejection> {
@@ -29,5 +28,5 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
 }
 
 pub async fn ok() -> Result<impl Reply, Infallible> {
-    Ok(warp::reply::json(&vec!["Nice to see the Test3 Rust WARP app up and running"]))
+    Ok(warp::reply::json(&vec!["Nice to see the Test4 Rust WARP app up and running"]))
 }

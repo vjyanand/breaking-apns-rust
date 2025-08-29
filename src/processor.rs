@@ -17,7 +17,7 @@ impl ApnsProcessor {
         let jwt_token = config.generate_jwt()?;
         for _ in 0..num_clients {
             if let Ok(client) = ApnsClient::new(config, &jwt_token) {
-               // clients.push(client);
+                clients.push(client);
             }
         }
         Ok(Self { clients })
