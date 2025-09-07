@@ -23,8 +23,7 @@ RUN touch src/main.rs && cargo build --release
 FROM alpine:3.20
 
 # Install necessary runtime dependencies
-RUN apk add --no-cache musl-dev build-base pkgconfig openssl-dev ca-certificates tzdata && update-ca-certificates
-#RUN apt-get update && apt-get install -y heaptrack procps gdb 
+RUN apk add --no-cache linux-headers clang-dev musl-dev build-base pkgconfig openssl-dev ca-certificates tzdata && update-ca-certificates
 
 # Create a non-root user
 RUN addgroup -g 1001 -S appgroup
