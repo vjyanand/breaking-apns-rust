@@ -1,27 +1,8 @@
-# Builder stage: Use Alpine-based Rust for musl
-FROM rust:alpine3.20 as builder
+FROM alpine:latest
 
-WORKDIR /app
+RUN apk add --update --no-cache --repository https://dl-3.alpinelinux.org/alpine/latest-stable/community --repository https://dl-3.alpinelinux.org/alpine/latest-stable/main rust cargo openssl-dev
 
-# Install C build tools for aws-lc-sys and static linking
-RUN apk add --no-cache \
-    musl-tools \
-    build-base \
-    clang-dev \
-    musl-dev \
-    linux-headers \
-    pkgconfig \
-    openssl-dev \
-    cmake \
-    
-# Add musl target early
-RUN rustup target add x86_64-unknown-linux-musl
-
-# Set env vars for static musl build and include paths (fixes header errors)
-ENV RUSTFLAGS="-C linker=musl-gcc -C target-feature=+crt-static"
-ENV C_INCLUDE_PATH="/usr/include"
-ENV CPLUS_INCLUDE_PATH="/usr/include"
-ENV LIBRARY_PATH="/usr/lib"
+WORKDIR /opt/breaking
 
 # Copy Cargo files for caching
 COPY Cargo.toml ./
@@ -30,35 +11,29 @@ COPY Cargo.toml ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
 # Build deps with target (caches musl artifacts)
-RUN cargo build --release --target x86_64-unknown-linux-musl && rm -rf src
+RUN cargo build --release && rm -rf src
 
 # Copy real src
 COPY src ./src
 
 # Final build (touch to trigger rebuild)
-RUN touch src/main.rs && cargo build --release --target x86_64-unknown-linux-musl
+RUN touch src/main.rs && cargo build --release
 
 # Runtime: Minimal Alpine
-FROM alpine:3.20
+FROM alpine:latest
 
-# Only runtime essentials (HTTPS for APNs)
-RUN apk add --no-cache ca-certificates tzdata && update-ca-certificates
+RUN apk add --update --no-cache --repository https://dl-3.alpinelinux.org/alpine/latest-stable/community --repository https://dl-3.alpinelinux.org/alpine/latest-stable/main libgcc
 
-# Non-root user
-RUN addgroup -g 1001 -S appgroup && adduser -S appuser -u 1001 -G appgroup
+WORKDIR /opt/breaking
 
-WORKDIR /app
+COPY --from=0 /opt/breaking/target/release/serverAPNS ./
 
-# Copy binary and key with ownership
-COPY --from=builder --chown=appuser:appgroup /app/target/x86_64-unknown-linux-musl/release/serverAPNS ./serverAPNS
-COPY --chown=appuser:appgroup key.p8 ./key.p8
-
-# Switch user
-USER appuser
+ENV PORT 9090
 
 EXPOSE 9090
-ENV PORT=9090
-ENV RUST_LOG=INFO
 
-# Run (match binary name)
-CMD ["/app/serverAPNS"]
+ENV RUST_BACKTRACE=1
+
+ENV RUST_LOG=info,reqwest=warn,hyper_util::client::legacy::connect::http=warn,hyper_util::client::legacy::pool=warn,hyper_util::client::legacy::connect::dns=warn
+
+CMD ["./serverAPNS"]
