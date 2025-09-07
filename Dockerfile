@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Install C build tools for aws-lc-sys and static linking
 RUN apk add --no-cache \
+    musl-tools \
     build-base \
     clang-dev \
     musl-dev \
@@ -12,8 +13,7 @@ RUN apk add --no-cache \
     pkgconfig \
     openssl-dev \
     cmake \
-    nasm  # If FIPS or assembly tests needed; optional otherwise
-
+    
 # Add musl target early
 RUN rustup target add x86_64-unknown-linux-musl
 
