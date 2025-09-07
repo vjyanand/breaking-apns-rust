@@ -6,6 +6,7 @@ on:
     branches:
       - master
       - warp
+      - metrics
 jobs:
   deploy:
     name: Deploy APNS app
