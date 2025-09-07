@@ -16,8 +16,10 @@ RUN cargo build --release && rm -rf src
 # Copy the actual source code
 COPY src ./src
 
+RUN rustup target add x86_64-unknown-linux-musl
+
 # Build the application
-RUN touch src/main.rs && cargo build --release
+RUN touch src/main.rs && cargo build --release -target x86_64-unknown-linux-musl
 
 # Use a smaller base image for the final stage
 FROM alpine:3.20
