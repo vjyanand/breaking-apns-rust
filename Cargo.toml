@@ -28,10 +28,6 @@ warp = { version = "0.4.2", features = ["server"] }
 name = "serverAPNS"
 path = "src/main.rs"
 
-#[[bin]]
-#name = "cli"
-#path = "src/cli.rs"
-
 [profile.release]
 opt-level = 3     # Maximum optimization for performance
 lto = "fat"       # Enable full Link-Time Optimization

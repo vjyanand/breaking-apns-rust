@@ -112,7 +112,6 @@ fn get_shared_news_source(id: i64) -> &'static str {
     SHARED_NEWS_SOURCE.get_or_init(|| get_source_name(id))
 }
 
-
 const fn get_sound_name(sound_id: i16) -> &'static str {
     match sound_id {
         0 => "",
