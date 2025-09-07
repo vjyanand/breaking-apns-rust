@@ -1,5 +1,5 @@
 # Use the official Rust image as a build stage
-FROM rust:latest as builder
+FROM rust:alpine3.20 as builder
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -20,16 +20,16 @@ COPY src ./src
 RUN touch src/main.rs && cargo build --release
 
 # Use a smaller base image for the final stage
-FROM debian:bookworm-slim
+FROM alpine:3.20
 
 # Install necessary runtime dependencies
-RUN apt-get update && apt-get install -y ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
+RUN apk add --no-cache ca-certificates tzdata && update-ca-certificates
 #RUN apt-get update && apt-get install -y heaptrack procps gdb 
-    
+
 # Create a non-root user
-RUN useradd -r -s /bin/false appuser
+RUN addgroup -g 1001 -S appgroup
+
+RUN adduser -S appuser -u 1001 -G appgroupr
 
 # Set the working directory
 WORKDIR /app
@@ -40,7 +40,7 @@ COPY --from=builder /app/target/release/serverAPNS ./app
 COPY key.p8 /app
 
 # Change ownership to the non-root user
-RUN chown -R appuser:appuser /app
+RUN chown -R appuser:appgroup /app
 
 # Switch to the non-root user
 USER appuser
@@ -52,4 +52,4 @@ ENV PORT=9090
 ENV RUST_LOG=INFO
 
 # Run the application
-CMD ["/app/app"]
+CMD ["/app/serverAPNS"]

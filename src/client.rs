@@ -6,7 +6,7 @@ use crate::{
 };
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Uri, body::Bytes};
-use hyper_rustls::HttpsConnector;
+use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use hyper_util::{
     client::legacy::{Client, connect::HttpConnector},
     rt::{TokioExecutor, TokioTimer},
@@ -22,7 +22,7 @@ pub struct ApnsClient {
 impl ApnsClient {
     pub fn new(config: &ApnsConfig, jwt_token: &String) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let base_url = if config.sandbox { "https://api.sandbox.push.apple.com" } else { "https://api.push.apple.com" };
-        let https = hyper_rustls::HttpsConnectorBuilder::new().with_native_roots()?.https_only().enable_http2().build();
+        let https = HttpsConnectorBuilder::new().with_native_roots()?.https_only().enable_http2().build();
         let client: Client<HttpsConnector<HttpConnector>, Full<Bytes>> = Client::builder(TokioExecutor::new())
             .pool_timer(TokioTimer::new())
             .pool_idle_timeout(Duration::from_secs(30))
