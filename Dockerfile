@@ -29,7 +29,7 @@ RUN apk add --no-cache ca-certificates tzdata && update-ca-certificates
 # Create a non-root user
 RUN addgroup -g 1001 -S appgroup
 
-RUN adduser -S appuser -u 1001 -G appgroupr
+RUN adduser -S appuser -u 1001 -G appgroup
 
 # Set the working directory
 WORKDIR /app
