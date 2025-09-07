@@ -37,7 +37,7 @@ impl ApnsProcessor {
         if let Ok(pool) = Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await {
             let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&pool);
             stream
-                .for_each_concurrent(Some(self.clients.len()), |notification| async move {
+                .for_each_concurrent(Some(self.clients.len() * 100), |notification| async move {
                     if let Ok(notification) = notification {
                         let mut hasher = DefaultHasher::new();
                         notification.device_token.hash(&mut hasher);
