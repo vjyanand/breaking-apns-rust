@@ -49,22 +49,22 @@ impl ApnsProcessor {
                     let client = &self.clients[index];
                     match client.send_notification(&notification).await {
                         Ok(push_result) => {
-                            if let Some(result) = push_result {
-                                if result.status_code == 410 {
-                                    if let Ok(apns_id) = result.apns_id {
-                                        warn!("DB-UPDATE-APNS-FAIL: ID={}, Status={}, Error={:?}", apns_id, result.status_code, result.error);
-                                        if let Ok(inner_pool) = Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await {
-                                            if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(apns_id).execute(&inner_pool).await {
-                                                warn!("Failed to update APNS notification: {err}");
-                                            }
-                                            inner_pool.close().await;
-                                        }
-                                    } else {
-                                        warn!("Failed to parse APNS notification: {result:?}");
-                                    }
+                            let Some(result) = push_result else { return };
+                            if result.status_code != 410 {
+                                warn!("APNS notification send error: {result:?}");
+                                return;
+                            }
+                            let Ok(apns_id) = result.apns_id else {
+                                warn!("Failed to parse APNS notification: {result:?}");
+                                return;
+                            };
+                            if let Ok(inner_pool) = Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await {
+                                if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(apns_id).execute(&inner_pool).await {
+                                    warn!("Failed to update APNS notification: {err}");
                                 } else {
-                                    warn!("APNS notification send error: {result:?}");
+                                    warn!("DB-UPDATE-APNS-FAIL: ID={}, Status={}, Error={:?}", apns_id, result.status_code, result.error);
                                 }
+                                inner_pool.close().await;
                             }
                         }
                         Err(err) => {
