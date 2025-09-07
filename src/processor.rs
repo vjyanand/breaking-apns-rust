@@ -34,45 +34,46 @@ impl ApnsProcessor {
             FROM apns_master dm, news_master nm \
             WHERE (dm.news_id & nm.news_id = nm.news_id) AND {device_hash_filter} nm.id = $1"
         );
-        if let Ok(pool) = Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await {
-            let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&pool);
-            stream
-                .for_each_concurrent(Some(self.clients.len() * 100), |notification| async move {
-                    if let Ok(notification) = notification {
-                        let mut hasher = DefaultHasher::new();
-                        notification.device_token.hash(&mut hasher);
-                        let hash = hasher.finish();
-                        let index = (hash % self.clients.len() as u64) as usize;
-                        let client = &self.clients[index];
-                        match client.send_notification(&notification).await {
-                            Ok(push_result) => {
-                                if let Some(result) = push_result {
-                                    if result.status_code == 410 {
-                                        if let Ok(apns_id) = result.apns_id {
-                                            warn!("DB-UPDATE-APNS-FAIL: ID={}, Status={}, Error={:?}", apns_id, result.status_code, result.error);
-                                            if let Ok(inner_pool) = Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await {
-                                                if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(apns_id).execute(&inner_pool).await {
-                                                    warn!("Failed to update APNS notification: {err}");
-                                                }
-                                                inner_pool.close().await;
+        let Ok(pool) = Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await else {
+            warn!("Failed to get db connection pool");
+            return;
+        };
+        let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&pool);
+        stream
+            .for_each_concurrent(Some(self.clients.len() * 100), |notification| async move {
+                if let Ok(notification) = notification {
+                    let mut hasher = DefaultHasher::new();
+                    notification.device_token.hash(&mut hasher);
+                    let hash = hasher.finish();
+                    let index = (hash % self.clients.len() as u64) as usize;
+                    let client = &self.clients[index];
+                    match client.send_notification(&notification).await {
+                        Ok(push_result) => {
+                            if let Some(result) = push_result {
+                                if result.status_code == 410 {
+                                    if let Ok(apns_id) = result.apns_id {
+                                        warn!("DB-UPDATE-APNS-FAIL: ID={}, Status={}, Error={:?}", apns_id, result.status_code, result.error);
+                                        if let Ok(inner_pool) = Pool::<Postgres>::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await {
+                                            if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(apns_id).execute(&inner_pool).await {
+                                                warn!("Failed to update APNS notification: {err}");
                                             }
-                                        } else {
-                                            warn!("Failed to parse APNS notification: {result:?}");
+                                            inner_pool.close().await;
                                         }
                                     } else {
-                                        warn!("APNS notification send error: {result:?}");
+                                        warn!("Failed to parse APNS notification: {result:?}");
                                     }
+                                } else {
+                                    warn!("APNS notification send error: {result:?}");
                                 }
                             }
-                            Err(err) => {
-                                warn!("Error sending notification: {err}");
-                            }
+                        }
+                        Err(err) => {
+                            warn!("Error sending notification: {err}");
                         }
                     }
-                })
-                .await;
-
-            pool.close().await;
-        }
+                }
+            })
+            .await;
+        pool.close().await;
     }
 }
