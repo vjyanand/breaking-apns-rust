@@ -28,6 +28,8 @@ WORKDIR /opt/breaking
 
 COPY --from=0 /opt/breaking/target/release/serverAPNS ./
 
+COPY key.p8 ./
+
 ENV PORT 9090
 
 EXPOSE 9090
