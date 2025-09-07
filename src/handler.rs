@@ -28,9 +28,9 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
         processor.process_notifications(news_id, device_hash).await;
         warn!("Finished processing notifications {news_id}");
     }
-    Ok(Box::new(warp::reply::with_status("Ok5", warp::http::StatusCode::OK)))
+    Ok(Box::new(warp::reply::with_status("Ok", warp::http::StatusCode::OK)))
 }
 
 pub async fn ok() -> Result<impl Reply, Infallible> {
-    Ok(warp::reply::json(&vec!["Nice to see the Rust WARP app up and running"]))
+    Ok(warp::reply::json(&vec!["Good to see the Rust WARP app up and running"]))
 }
