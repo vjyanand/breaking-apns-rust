@@ -26,7 +26,7 @@ async fn main() {
     // Combine routes with middleware
     let routes = stats.or(push).with(warp::log("apns_server")).with(warp::reply::with::header("X-Version", env!("CARGO_PKG_VERSION")));
 
-    warn!("Starting WARP APNs server at 0.0.0.0:{port}");
+    warn!("Starting WARP APNS server at 0.0.0.0:{port}");
 
     warp::serve(routes).run(([0, 0, 0, 0], port)).await;
 }

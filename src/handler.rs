@@ -1,18 +1,16 @@
 use std::{collections::HashMap, convert::Infallible};
 
 use crate::{config::ApnsConfig, processor::ApnsProcessor};
-use log::warn;
+use log::{info, warn};
 use warp::{reject::Rejection, reply::Reply};
 
 pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Rejection> {
-    let news_id = match query.get("newsId") {
-        Some(id) => match id.parse::<i64>() {
-            Ok(id) => id,
-            Err(_) => return Ok(Box::new(warp::reply::with_status("Invalid newsId", warp::http::StatusCode::BAD_REQUEST))),
-        },
-        None => return Ok(Box::new(warp::reply::with_status("Missing newsId", warp::http::StatusCode::BAD_REQUEST))),
+    let Some(news_id) = query.get("newsId") else {
+        return Ok(Box::new(warp::reply::with_status("Missing newsId", warp::http::StatusCode::BAD_REQUEST)));
     };
-
+    let Ok(news_id) = news_id.parse::<i64>() else {
+        return Ok(Box::new(warp::reply::with_status("Invalid newsId", warp::http::StatusCode::BAD_REQUEST)));
+    };
     let private_key = match std::fs::read_to_string("key.p8") {
         Ok(private_key) => private_key,
         Err(e) => {
@@ -26,7 +24,7 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
     if let Ok(processor) = ApnsProcessor::new(&config, 60) {
         let device_hash = query.get("dhash");
         processor.process_notifications(news_id, device_hash).await;
-        warn!("Finished processing notifications {news_id}");
+        info!("Finished processing notifications {news_id}");
     }
     Ok(Box::new(warp::reply::with_status("Ok", warp::http::StatusCode::OK)))
 }
