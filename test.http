@@ -10,7 +10,7 @@ GET http://localhost:9090/push/ios/breaking?newsId=404147
 GET https://test.breaking.apns.iavian.net/stats
 
 ###
-GET https://test.breaking.apns.iavian.net/push/ios/breaking?newsId=404147
+GET https://test.breaking.apns.iavian.net/push/ios/breaking?newsId=404147&dhash1=7C0D8F39-BE16-4994-9BCE-B0ED023646B6
 
 ###
 GET http://144.202.29.109:9090/push/ios/breaking?newsId=404147&dhash=7C0D8F39-BE16-4994-9BCE-B0ED023646B6
