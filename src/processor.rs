@@ -36,7 +36,7 @@ impl ApnsProcessor {
         };
         let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&mut conn);
         stream
-            .for_each_concurrent(Some(5000), |notification| async move {
+            .for_each_concurrent(Some(6000), |notification| async move {
                 if let Ok(notification) = notification {
                     let mut hasher = DefaultHasher::new();
                     notification.device_token.hash(&mut hasher);
