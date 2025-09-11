@@ -26,6 +26,7 @@ primary_region = 'sjc'
       idle_timeout = 30
 
 [[vm]]
-  memory = '512mb'
+  memory = '768mb'
   cpu_kind = 'shared'
   cpus = 2
+  swap_size_mb = 512
