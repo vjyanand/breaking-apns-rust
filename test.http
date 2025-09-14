@@ -16,4 +16,4 @@ GET https://test.breaking.apns.iavian.net/push/ios/breaking?newsId=404147&dhash1
 GET https://breaking-apns-rust-376581962800.us-west1.run.app/push/ios/breaking?newsId=407102
 
 ### 5928 4564 6632
-GET http://144.202.29.109:9090/stats
+GET https://breaking-apns-rust-376581962800.us-west1.run.app/stats

@@ -1,7 +1,7 @@
 use serde::Serialize;
 use serde_json::{Map, Value};
 use sqlx::{FromRow, Row, Type};
-use std::{borrow::Cow, sync::OnceLock};
+use std::borrow::Cow;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize)]
@@ -106,12 +106,6 @@ fn get_source_name(id: i64) -> &'static str {
     }
 }
 
-static SHARED_NEWS_SOURCE: OnceLock<&str> = OnceLock::new();
-
-fn get_shared_news_source(id: i64) -> &'static str {
-    SHARED_NEWS_SOURCE.get_or_init(|| get_source_name(id))
-}
-
 const fn get_sound_name(sound_id: i16) -> &'static str {
     match sound_id {
         0 => "",
@@ -133,7 +127,7 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
         let sound_id: i16 = row.try_get("sound_id")?;
         let news_id: i64 = row.try_get("news_id")?;
 
-        let news_source = get_shared_news_source(news_id);
+        let news_source = get_source_name(news_id);
         let push_type: BreakingApnsType = row.try_get("type")?;
         let news_date: i64 = row.try_get("news_date")?;
 
