@@ -13,7 +13,7 @@ GET https://test.breaking.apns.iavian.net/stats
 GET https://test.breaking.apns.iavian.net/push/ios/breaking?newsId=404147&dhash1=7C0D8F39-BE16-4994-9BCE-B0ED023646B6
 
 ###
-GET http://144.202.29.109:9090/push/ios/breaking?newsId=404147&dhash=7C0D8F39-BE16-4994-9BCE-B0ED023646B6
+GET https://breaking-apns-rust-376581962800.us-west1.run.app/push/ios/breaking?newsId=407102
 
 ### 5928 4564 6632
-GET http://144.202.29.109:9090/stats
+GET https://breaking-apns-rust-376581962800.us-west1.run.app/stats

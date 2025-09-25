@@ -1,7 +1,7 @@
 use serde::Serialize;
 use serde_json::{Map, Value};
 use sqlx::{FromRow, Row, Type};
-use std::{borrow::Cow, sync::OnceLock};
+use std::borrow::Cow;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize)]
@@ -64,9 +64,9 @@ fn get_source_name(id: i64) -> &'static str {
         256 => "The Spectator Index",
         512 => "Fox News",
         1024 => "Fox Business",
-        2048 => "NYT",
-        4096 => "AP",
-        8192 => "NYP",
+        2048 => "New York Times",
+        4096 => "Associated Press",
+        8192 => "New York Post",
         16384 => "CBS News",
         32768 => "France 24",
         65536 => "ESPN",
@@ -75,7 +75,7 @@ fn get_source_name(id: i64) -> &'static str {
         524288 => "AFP",
         1048576 => "Sky News",
         2097152 => "Bloomberg",
-        4194304 => "NigeriaStories",
+        4194304 => "Nigeria Stories",
         8388608 => "Sky Sports",
         16777216 => "People's Daily",
         33554432 => "Al Jazeera",
@@ -88,7 +88,7 @@ fn get_source_name(id: i64) -> &'static str {
         4294967296 => "The Hill",
         8589934592 => "NFL",
         17179869184 => "NHKニュース",
-        34359738368 => "TorontoStar",
+        34359738368 => "Toronto Star",
         68719476736 => "Sky News Australia",
         137438953472 => "The Washington Post",
         274877906944 => "Forbes",
@@ -96,20 +96,14 @@ fn get_source_name(id: i64) -> &'static str {
         1099511627776 => "ABS-CBN News",
         2199023255552 => "The National",
         4398046511104 => "Israel News",
-        8796093022208 => "NZ News",
+        8796093022208 => "The Kobeissi Letter",
         17592186044416 => "DW News",
         35184372088832 => "Newsmax",
         70368744177664 => "RedState",
-        140737488355328 => "TheBlaze",
+        140737488355328 => "The Blaze",
         281474976710656 => "Agenzia ANSA",
         _ => "WSJ❔",
     }
-}
-
-static SHARED_NEWS_SOURCE: OnceLock<&str> = OnceLock::new();
-
-fn get_shared_news_source(id: i64) -> &'static str {
-    SHARED_NEWS_SOURCE.get_or_init(|| get_source_name(id))
 }
 
 const fn get_sound_name(sound_id: i16) -> &'static str {
@@ -133,7 +127,7 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
         let sound_id: i16 = row.try_get("sound_id")?;
         let news_id: i64 = row.try_get("news_id")?;
 
-        let news_source = get_shared_news_source(news_id);
+        let news_source = get_source_name(news_id);
         let push_type: BreakingApnsType = row.try_get("type")?;
         let news_date: i64 = row.try_get("news_date")?;
 
