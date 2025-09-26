@@ -14,7 +14,7 @@ async fn main() {
         .format_timestamp_secs() // Include timestamps in seconds
         .init();
 
-    let port: u16 = env::var("PORT").unwrap_or_else(|_| String::from("9090")).parse().expect("PORT must be a number");
+    let port: u16 = env::var("PORT").unwrap_or_else(|_| String::from("8080")).parse().expect("PORT must be a number");
 
     let stats = warp::path("stats").and(warp::get()).and_then(handler::ok);
 
