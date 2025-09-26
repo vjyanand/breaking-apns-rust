@@ -9,7 +9,6 @@ pub async fn push(query: HashMap<String, String>, headers: HeaderMap) -> Result<
     // Print all headers related to remote IP
     for (name, value) in headers.iter() {
         if let Ok(value_str) = value.to_str() {
-            // Check for headers commonly used for remote IP
             if name.as_str().to_lowercase().contains("forwarded") || name.as_str().to_lowercase().contains("real-ip") || name.as_str() == "x-forwarded-for" || name.as_str() == "x-real-ip" {
                 println!("Header {name}: {value_str}");
             }
