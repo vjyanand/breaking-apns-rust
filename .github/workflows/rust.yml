@@ -11,7 +11,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: debian:latest
+    container: debian:bookworm
     
     steps:
     - uses: actions/checkout@v4
