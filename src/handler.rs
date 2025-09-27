@@ -1,20 +1,10 @@
 use std::{collections::HashMap, convert::Infallible};
 
 use crate::{config::ApnsConfig, processor::ApnsProcessor};
-use hyper::HeaderMap;
 use log::{info, warn};
 use warp::{reject::Rejection, reply::Reply};
 
-pub async fn push(query: HashMap<String, String>, headers: HeaderMap) -> Result<Box<dyn Reply>, Rejection> {
-    // Print all headers related to remote IP
-    for (name, value) in headers.iter() {
-        if let Ok(value_str) = value.to_str() {
-            if name.as_str().to_lowercase().contains("forwarded") || name.as_str().to_lowercase().contains("real-ip") || name.as_str() == "x-forwarded-for" || name.as_str() == "x-real-ip" {
-                println!("Header {name}: {value_str}");
-            }
-        }
-    }
-
+pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Rejection> {
     let Some(news_id) = query.get("newsId") else {
         return Ok(Box::new(warp::reply::with_status("Missing newsId", warp::http::StatusCode::BAD_REQUEST)));
     };

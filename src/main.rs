@@ -21,7 +21,6 @@ async fn main() {
     let push = warp::path!("push" / "ios" / "breaking")
         .and(warp::get())
         .and(warp::query::<std::collections::HashMap<String, String>>())
-        .and(warp::header::headers_cloned()) // Extract headers
         .and_then(handler::push);
 
     // Combine routes with middleware
