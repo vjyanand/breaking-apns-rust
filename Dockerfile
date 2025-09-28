@@ -30,11 +30,9 @@ COPY --from=0 /opt/breaking/target/release/serverAPNS ./
 
 COPY key.p8 ./
 
-ENV PORT 9090
+ENV PORT 8080
 
-EXPOSE 9090
-
-ENV RUST_BACKTRACE=1
+EXPOSE 8080
 
 ENV RUST_LOG=info,reqwest=warn,hyper_util::client::legacy::connect::http=warn,hyper_util::client::legacy::pool=warn,hyper_util::client::legacy::connect::dns=warn
 

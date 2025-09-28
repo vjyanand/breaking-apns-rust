@@ -1,9 +1,9 @@
 name: Rust
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "metrics" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "metrics" ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -11,7 +11,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: debian:latest
+    container: debian:bookworm
     
     steps:
     - uses: actions/checkout@v4
