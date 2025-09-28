@@ -34,8 +34,6 @@ ENV PORT 8080
 
 EXPOSE 8080
 
-ENV RUST_BACKTRACE=1
-
 ENV RUST_LOG=info,reqwest=warn,hyper_util::client::legacy::connect::http=warn,hyper_util::client::legacy::pool=warn,hyper_util::client::legacy::connect::dns=warn
 
 CMD ["./serverAPNS"]

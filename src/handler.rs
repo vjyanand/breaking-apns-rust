@@ -21,7 +21,7 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
     };
 
     let config = ApnsConfig { key_id: "9F437T6Y4G".to_string(), team_id: "JX83D66C47".to_string(), private_key, sandbox: false };
-    if let Ok(processor) = ApnsProcessor::new(&config, 100) {
+    if let Ok(processor) = ApnsProcessor::new(&config, 120) {
         let device_hash = query.get("dhash");
         processor.process_notifications(news_id, device_hash).await;
         info!("Finished processing notifications {news_id}");
@@ -30,5 +30,6 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
 }
 
 pub async fn ok() -> Result<impl Reply, Infallible> {
+    info!("Stats endpoint called");
     Ok(warp::reply::json(&vec!["Good to see the Rust WARP App up and running"]))
 }
