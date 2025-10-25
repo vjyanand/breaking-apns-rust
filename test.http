@@ -7,7 +7,7 @@ GET http://localhost:8080/stats
 GET http://localhost:8080/push/ios/breaking?newsId=404147&dhash=7C0D8F39-BE16-4994-9BCE-B0ED023646B6
 
 ###
-GET https://breaking.apns.iavian.net/push/ios/breaking?newsIds=407102
+GET https://breaking.apns.iavian.net/push/ios/breaking?newsId=411265
 
 ### 5928 4564 6632
 GET https://breaking-apns-rust-376581962800.us-west1.run.app/stats
