@@ -24,7 +24,7 @@ impl ApnsConfig {
         let mut header = Header::new(Algorithm::ES256);
         header.kid = Some(self.key_id.clone());
 
-        let key = EncodingKey::from_ec_pem(self.private_key.as_bytes())?;
+        let key = EncodingKey::from_ec_der(self.private_key.as_bytes());
         let token = encode(&header, &claims, &key)?;
         Ok(token)
     }
