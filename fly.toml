@@ -34,3 +34,13 @@ primary_region = 'sjc'
   memory = '768mb'
   cpu_kind = 'shared'
   cpus = 2
+
+[checks]
+  [checks.name_of_your_http_check]
+    grace_period = "30s"
+    interval = "30m"
+    method = "get"
+    path = "/stats"
+    port = 8080
+    timeout = "10s"
+    type = "http"
