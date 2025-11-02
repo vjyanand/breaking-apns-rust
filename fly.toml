@@ -36,7 +36,7 @@ primary_region = 'sjc'
   cpus = 2
 
 [checks]
-  [checks.name_of_your_http_check]
+  [checks.stats]
     grace_period = "30s"
     interval = "30m"
     method = "get"
