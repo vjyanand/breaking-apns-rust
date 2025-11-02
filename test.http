@@ -9,5 +9,5 @@ GET http://localhost:8080/push/ios/breaking?newsId=404147&dhash=7C0D8F39-BE16-49
 ###
 GET https://breaking.apns.iavian.net/push/ios/breaking?newsId=411265
 
-### 5928 4564 6632
-GET https://breaking-apns-rust-376581962800.us-west1.run.app/stats
+###
+GET https://breaking.apns.iavian.net/stats
