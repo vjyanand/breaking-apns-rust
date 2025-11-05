@@ -25,7 +25,7 @@ impl ApnsClient {
         let https = HttpsConnectorBuilder::new().with_native_roots()?.https_only().enable_http2().build();
         let client: Client<HttpsConnector<HttpConnector>, Full<Bytes>> = Client::builder(TokioExecutor::new())
             .pool_timer(TokioTimer::new())
-            .pool_idle_timeout(Duration::from_secs(30))
+            .pool_idle_timeout(Duration::from_secs(20))
             .pool_max_idle_per_host(5)
             .http2_only(true)
             .http2_adaptive_window(true)

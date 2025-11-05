@@ -21,7 +21,7 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
     };
 
     let config = ApnsConfig { key_id: "9F437T6Y4G".to_owned(), team_id: "JX83D66C47".to_owned(), private_key, sandbox: false };
-    if let Ok(processor) = ApnsProcessor::new(&config, 400) {
+    if let Ok(processor) = ApnsProcessor::new(&config, 500) {
         let device_hash = query.get("dhash");
         processor.process_notifications(news_id, device_hash).await;
         info!("Finished processing notifications {news_id}");

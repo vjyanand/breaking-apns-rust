@@ -5,6 +5,7 @@ use log::warn;
 use sqlx::{Connection, PgConnection};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
+const POSTGRES_CONNECTION_STRING: &str = "postgres://breaking:qwertY123@db.iavian.net/breaking";
 pub struct ApnsProcessor {
     clients: Vec<ApnsClient>,
 }
@@ -30,7 +31,7 @@ impl ApnsProcessor {
                 "SELECT CASE WHEN LENGTH(COALESCE(nm.url, '')) < 3 THEN CONCAT('https://breaking.iavian.net/article/', nm.id)::TEXT ELSE url END AS url, dm.id, nm.id AS nId, dm.devicehash, dm.token, dm.sound_id, trim(nm.text) AS text, (case WHEN _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' THEN ((_from, _to) OVERLAPS (current_time, current_time)) ELSE (case WHEN _from <= current_time OR _to >= current_time THEN true ELSE false END) END) AS playsound, dm.paid, extract(epoch from nm.news_date)::BIGINT AS news_date, dm.type, nm.news_id FROM apns_master dm, news_master nm WHERE (dm.news_id & nm.news_id = nm.news_id) AND nm.id = $1",
             ),
         };
-        let Ok(mut conn) = PgConnection::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await else {
+        let Ok(mut conn) = PgConnection::connect(POSTGRES_CONNECTION_STRING).await else {
             warn!("Failed to get db connection");
             return;
         };
@@ -55,7 +56,7 @@ impl ApnsProcessor {
                                 return;
                             };
 
-                            if let Ok(mut inner_conn) = PgConnection::connect("postgres://breaking:qwertY123@db.iavian.net/breaking").await {
+                            if let Ok(mut inner_conn) = PgConnection::connect(POSTGRES_CONNECTION_STRING).await {
                                 if let Err(err) = sqlx::query("UPDATE apns_master SET news_id = 0 WHERE id = $1").bind(apns_id).execute(&mut inner_conn).await {
                                     warn!("Failed to update APNS notification: {err}");
                                 } else {
