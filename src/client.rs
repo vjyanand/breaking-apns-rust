@@ -25,10 +25,15 @@ impl ApnsClient {
         let https = HttpsConnectorBuilder::new().with_native_roots()?.https_only().enable_http2().build();
         let client: Client<HttpsConnector<HttpConnector>, Full<Bytes>> = Client::builder(TokioExecutor::new())
             .pool_timer(TokioTimer::new())
-            .pool_idle_timeout(Duration::from_secs(20))
-            .pool_max_idle_per_host(5)
+            .pool_idle_timeout(Duration::from_secs(90))
+            .pool_max_idle_per_host(10)
             .http2_only(true)
             .http2_adaptive_window(true)
+            .http2_initial_stream_window_size(2 * 1024 * 1024) // 2MB
+            .http2_initial_connection_window_size(4 * 1024 * 1024) // 4MB
+            .http2_keep_alive_interval(Duration::from_secs(10))
+            .http2_keep_alive_timeout(Duration::from_secs(20))
+            .http2_keep_alive_while_idle(true)
             .build(https);
 
         let base_url = String::from_str(base_url)?;

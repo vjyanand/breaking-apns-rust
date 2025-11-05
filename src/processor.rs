@@ -3,7 +3,6 @@ use crate::{apns::PushNotification, config::ApnsConfig};
 use futures_util::StreamExt;
 use log::warn;
 use sqlx::{Connection, PgConnection};
-use std::hash::{DefaultHasher, Hash, Hasher};
 
 const POSTGRES_CONNECTION_STRING: &str = "postgres://breaking:qwertY123@db.iavian.net/breaking";
 pub struct ApnsProcessor {
@@ -22,6 +21,26 @@ impl ApnsProcessor {
         Ok(Self { clients })
     }
 
+    #[inline]
+    fn select_client(&self, device_token: &str) -> usize {
+        const FNV_OFFSET: u64 = 0xcbf29ce484222325;
+        const FNV_PRIME: u64 = 0x100000001b3;
+
+        let mut hash = FNV_OFFSET;
+        for byte in device_token.bytes() {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(FNV_PRIME);
+        }
+
+        // Fast modulo using bitwise AND when clients.len() is power of 2
+        // Otherwise fall back to standard modulo
+        if self.clients.len().is_power_of_two() {
+            (hash as usize) & (self.clients.len() - 1)
+        } else {
+            (hash as usize) % self.clients.len()
+        }
+    }
+
     pub async fn process_notifications(&self, news_id: i64, device_hash: Option<&String>) {
         let sql = match device_hash {
             Some(device_hash) => format!(
@@ -37,12 +56,9 @@ impl ApnsProcessor {
         };
         let stream = sqlx::query_as::<_, PushNotification>(&sql).bind(news_id).fetch(&mut conn);
         stream
-            .for_each_concurrent(Some(1000), |notification| async move {
+            .for_each_concurrent(Some(500), |notification| async move {
                 if let Ok(notification) = notification {
-                    let mut hasher = DefaultHasher::new();
-                    notification.device_token.hash(&mut hasher);
-                    let hash = hasher.finish();
-                    let index = (hash % self.clients.len() as u64) as usize;
+                    let index = self.select_client(&notification.device_token);
                     let client = &self.clients[index];
                     match client.send_notification(&notification).await {
                         Ok(push_result) => {
