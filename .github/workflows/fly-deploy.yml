@@ -6,7 +6,7 @@ on:
     branches:
       - master
       - warp
-      - metrics
+      - tokio
 jobs:
   deploy:
     name: Deploy APNS app
