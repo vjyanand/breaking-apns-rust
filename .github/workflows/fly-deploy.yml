@@ -5,8 +5,7 @@ on:
   push:
     branches:
       - master
-      - warp
-      - tokio
+      - partition
 jobs:
   deploy:
     name: Deploy APNS app
