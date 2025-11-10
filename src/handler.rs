@@ -1,7 +1,6 @@
-use std::{collections::HashMap, convert::Infallible, sync::Arc};
+use std::{collections::HashMap, convert::Infallible};
 
 use crate::{config::ApnsConfig, processor::ApnsProcessor};
-use futures_util::future::join_all;
 use log::{info, warn};
 use warp::{reject::Rejection, reply::Reply};
 
@@ -22,22 +21,17 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
     };
 
     let config = ApnsConfig { key_id: "9F437T6Y4G".to_owned(), team_id: "JX83D66C47".to_owned(), private_key, sandbox: false };
-    let config = Arc::new(config);
+    let db_partition = query.get("db_partition");
     let device_hash = query.get("dhash");
+    let Some(db_partition) = db_partition.and_then(|s| s.parse::<u8>().ok()) else {
+        warn!("Error getting db_partition {:?}", db_partition);
+        let error_msg = "Error getting db_partition".to_owned();
+        return Ok(Box::new(warp::reply::with_status(error_msg, warp::http::StatusCode::INTERNAL_SERVER_ERROR)));
+    };
 
-    join_all(
-        (0..3)
-            .map(|index| {
-                let config = Arc::clone(&config);
-                async move {
-                    if let Ok(processor) = ApnsProcessor::new(&config, index, 5) {
-                        processor.process_notifications(news_id, device_hash).await
-                    }
-                }
-            })
-            .collect::<Vec<_>>(),
-    )
-    .await;
+    if let Ok(processor) = ApnsProcessor::new(&config, db_partition, 5) {
+        processor.process_notifications(news_id, device_hash).await
+    }
 
     Ok(Box::new(warp::reply::with_status("Ok", warp::http::StatusCode::OK)))
 }
