@@ -31,9 +31,9 @@ primary_region = 'sjc'
       idle_timeout = 30
 
 [[vm]]
-  memory = '768mb'
+  memory = '256mb'
   cpu_kind = 'shared'
-  cpus = 2
+  cpus = 4
 
 [checks]
   [checks.stats]

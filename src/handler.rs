@@ -26,7 +26,7 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
     let Some(db_partition) = db_partition.and_then(|s| s.parse::<u8>().ok()) else {
         warn!("Error getting db_partition {:?}", db_partition);
         let error_msg = "Error getting db_partition".to_owned();
-        return Ok(Box::new(warp::reply::with_status(error_msg, warp::http::StatusCode::INTERNAL_SERVER_ERROR)));
+        return Ok(Box::new(warp::reply::with_status(error_msg, warp::http::StatusCode::BAD_REQUEST)));
     };
 
     if let Ok(processor) = ApnsProcessor::new(&config, db_partition, 5) {
