@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for breaking-apns-rust-new on 2025-11-02T19:25:01+05:30
+# fly.toml app configuration file generated for breaking-apns-rust-new-billowing-dream-6818 on 2025-11-15T18:54:30+05:30
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'breaking-apns-rust-new'
+app = 'breaking-apns-rust-new-billowing-dream-6818'
 primary_region = 'sjc'
 
 [build]
@@ -30,17 +30,17 @@ primary_region = 'sjc'
     [services.ports.http_options]
       idle_timeout = 30
 
+[checks]
+  [checks.stats]
+    port = 8080
+    type = 'http'
+    interval = '30m0s'
+    timeout = '10s'
+    grace_period = '30s'
+    method = 'get'
+    path = '/stats'
+
 [[vm]]
   memory = '768mb'
   cpu_kind = 'shared'
   cpus = 2
-
-[checks]
-  [checks.stats]
-    grace_period = "30s"
-    interval = "30m"
-    method = "get"
-    path = "/stats"
-    port = 8080
-    timeout = "10s"
-    type = "http"
