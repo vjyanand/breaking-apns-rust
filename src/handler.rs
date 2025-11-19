@@ -21,15 +21,18 @@ pub async fn push(query: HashMap<String, String>) -> Result<Box<dyn Reply>, Reje
     };
 
     let config = ApnsConfig { key_id: "9F437T6Y4G".to_owned(), team_id: "JX83D66C47".to_owned(), private_key, sandbox: false };
-    if let Ok(processor) = ApnsProcessor::new(&config, 10) {
-        let device_hash = query.get("dhash");
-        processor.process_notifications(news_id, device_hash).await;
-        info!("Finished processing notifications {news_id}");
-    } else {
-        warn!("Error creating APNS processor");
-        let error_msg = "Error creating APNS processor".to_owned();
-        return Ok(Box::new(warp::reply::with_status(error_msg, warp::http::StatusCode::INTERNAL_SERVER_ERROR)));
+    let db_partition = query.get("db_partition");
+    let device_hash = query.get("dhash");
+    let Some(db_partition) = db_partition.and_then(|s| s.parse::<u8>().ok()) else {
+        warn!("Error getting db_partition {:?}", db_partition);
+        let error_msg = "Error getting db_partition".to_owned();
+        return Ok(Box::new(warp::reply::with_status(error_msg, warp::http::StatusCode::BAD_REQUEST)));
+    };
+
+    if let Ok(processor) = ApnsProcessor::new(&config, db_partition, 5) {
+        processor.process_notifications(news_id, device_hash).await
     }
+
     Ok(Box::new(warp::reply::with_status("Ok", warp::http::StatusCode::OK)))
 }
 

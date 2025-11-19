@@ -8,10 +8,11 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 const POSTGRES_CONNECTION_STRING: &str = "postgres://breaking:qwertY123@db.iavian.net/breaking";
 pub struct ApnsProcessor {
     clients: Vec<ApnsClient>,
+    index: u8,
 }
 
 impl ApnsProcessor {
-    pub fn new(config: &ApnsConfig, num_clients: usize) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn new(config: &ApnsConfig, index: u8, num_clients: usize) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let mut clients = Vec::with_capacity(num_clients);
         let jwt_token = config.generate_jwt()?;
         for _ in 0..num_clients {
@@ -19,16 +20,18 @@ impl ApnsProcessor {
                 clients.push(client);
             }
         }
-        Ok(Self { clients })
+        Ok(Self { clients, index })
     }
 
     pub async fn process_notifications(&self, news_id: i64, device_hash: Option<&String>) {
         let sql = match device_hash {
             Some(device_hash) => format!(
-                "SELECT CASE WHEN LENGTH(COALESCE(nm.url, '')) < 3 THEN CONCAT('https://breaking.iavian.net/article/', nm.id)::TEXT ELSE url END AS url, dm.id, nm.id AS nId, dm.devicehash, dm.token, dm.sound_id, trim(nm.text) AS text, (case WHEN _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' THEN ((_from, _to) OVERLAPS (current_time, current_time)) ELSE (case WHEN _from <= current_time OR _to >= current_time THEN true ELSE false END) END) AS playsound, dm.paid, extract(epoch from nm.news_date)::BIGINT AS news_date, dm.type, nm.news_id FROM apns_master dm, news_master nm WHERE (dm.news_id & nm.news_id = nm.news_id) AND dm.devicehash = '{device_hash}' AND nm.id = $1"
+                "SELECT CASE WHEN LENGTH(COALESCE(nm.url, '')) < 3 THEN CONCAT('https://breaking.iavian.net/article/', nm.id)::TEXT ELSE url END AS url, dm.id, nm.id AS nId, dm.devicehash, dm.token, dm.sound_id, trim(nm.text) AS text, (case WHEN _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' THEN ((_from, _to) OVERLAPS (current_time, current_time)) ELSE (case WHEN _from <= current_time OR _to >= current_time THEN true ELSE false END) END) AS playsound, dm.paid, extract(epoch from nm.news_date)::BIGINT AS news_date, dm.type, nm.news_id FROM p_apns_master_{0} dm, news_master nm WHERE (dm.news_id & nm.news_id = nm.news_id) AND dm.devicehash = '{device_hash}' AND nm.id = $1",
+                self.index
             ),
-            None => String::from(
-                "SELECT CASE WHEN LENGTH(COALESCE(nm.url, '')) < 3 THEN CONCAT('https://breaking.iavian.net/article/', nm.id)::TEXT ELSE url END AS url, dm.id, nm.id AS nId, dm.devicehash, dm.token, dm.sound_id, trim(nm.text) AS text, (case WHEN _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' THEN ((_from, _to) OVERLAPS (current_time, current_time)) ELSE (case WHEN _from <= current_time OR _to >= current_time THEN true ELSE false END) END) AS playsound, dm.paid, extract(epoch from nm.news_date)::BIGINT AS news_date, dm.type, nm.news_id FROM apns_master dm, news_master nm WHERE (dm.news_id & nm.news_id = nm.news_id) AND nm.id = $1",
+            None => format!(
+                "SELECT CASE WHEN LENGTH(COALESCE(nm.url, '')) < 3 THEN CONCAT('https://breaking.iavian.net/article/', nm.id)::TEXT ELSE url END AS url, dm.id, nm.id AS nId, dm.devicehash, dm.token, dm.sound_id, trim(nm.text) AS text, (case WHEN _from AT TIME ZONE 'UTC' < _to AT TIME ZONE 'UTC' THEN ((_from, _to) OVERLAPS (current_time, current_time)) ELSE (case WHEN _from <= current_time OR _to >= current_time THEN true ELSE false END) END) AS playsound, dm.paid, extract(epoch from nm.news_date)::BIGINT AS news_date, dm.type, nm.news_id FROM p_apns_master_{0} dm, news_master nm WHERE (dm.news_id & nm.news_id = nm.news_id) AND nm.id = $1",
+                self.index
             ),
         };
         let Ok(mut conn) = PgConnection::connect(POSTGRES_CONNECTION_STRING).await else {
