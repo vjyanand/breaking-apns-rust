@@ -48,7 +48,7 @@ impl ApnsClient {
         let mut request = Request::builder()
             .method(Method::POST)
             .uri(uri)
-            .header("authorization", format!("bearer {}", &self.jwt_token))
+            .header("authorization", format!("bearer {}", self.jwt_token))
             .header("content-type", "application/json")
             .header("content-length", payload.len().to_string())
             .header("apns-topic", topic);
