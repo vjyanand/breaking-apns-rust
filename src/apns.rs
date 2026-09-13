@@ -77,7 +77,7 @@ fn get_source_name(id: i64) -> &'static str {
         2097152 => "Bloomberg",
         4194304 => "Nigeria Stories",
         8388608 => "Sky Sports",
-        16777216 => "People's Daily",
+        16777216 => "R A W S A L E R T S",
         33554432 => "Al Jazeera",
         67108864 => "Reuters",
         134217728 => "XHNews",
