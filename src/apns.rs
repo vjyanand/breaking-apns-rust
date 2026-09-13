@@ -1,5 +1,4 @@
 use serde::Serialize;
-use serde_json::{Map, Value};
 use sqlx::{FromRow, Row, Type};
 use std::borrow::Cow;
 use uuid::Uuid;
@@ -7,8 +6,16 @@ use uuid::Uuid;
 #[derive(Debug, Serialize)]
 pub struct ApnsPayload {
     pub aps: ApsPayload,
-    #[serde(flatten)]
-    pub custom: Map<String, Value>,
+    #[serde(rename = "s")]
+    pub source: &'static str,
+    #[serde(rename = "nid")]
+    pub news_id: i64,
+    #[serde(rename = "p")]
+    pub paid: bool,
+    #[serde(rename = "t")]
+    pub news_date: i64,
+    #[serde(rename = "_u")]
+    pub url: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -125,9 +132,11 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
         let paid: bool = row.try_get("paid")?;
         let playsound: bool = row.try_get("playsound")?;
         let sound_id: i16 = row.try_get("sound_id")?;
-        let news_id: i64 = row.try_get("news_id")?;
+        // nm.news_id is the source bitmask; nm.id (aliased nId) is the article id.
+        let source_mask: i64 = row.try_get("news_id")?;
+        let news_id: i64 = row.try_get("nid")?;
 
-        let news_source = get_source_name(news_id);
+        let news_source = get_source_name(source_mask);
         let push_type: BreakingApnsType = row.try_get("type")?;
         let news_date: i64 = row.try_get("news_date")?;
 
@@ -146,17 +155,8 @@ impl<'r> FromRow<'r, sqlx::postgres::PgRow> for PushNotification {
 
         let aps = ApsPayload { alert: Some(alert), badge: None, sound, content_available: None };
 
-        // Pre-allocate exact capacity and use references where possible
-        let mut custom = Map::with_capacity(5);
-        custom.insert("s".into(), Value::String(news_source.into()));
-        custom.insert("nid".into(), Value::Number(news_id.into()));
-        custom.insert("p".into(), Value::Bool(paid));
-        custom.insert("t".into(), Value::Number(news_date.into()));
-
         let url: String = row.try_get("url")?;
-        custom.insert("_u".into(), Value::String(url));
-
-        let payload = ApnsPayload { aps, custom };
+        let payload = ApnsPayload { aps, source: news_source, news_id, paid, news_date, url };
         let collapse_id = Some(Cow::Borrowed(news_source));
 
         Ok(Self {
