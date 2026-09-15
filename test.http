@@ -4,7 +4,7 @@ GET https://breaking.apns.iavian.net/push/ios/breaking?newsId=412888&dhash=7C0D8
 GET http://localhost:8080/stats
 
 ###
-GET http://localhost:8080/push/ios/breaking?db_partitiwon=1&newsId=404147&dhash=7C0D8F39-BE16-4994-9BCE-B0ED023646B6
+GET http://localhost:8080/push/ios/breaking?db_partition=4&newsId=404147&dhash=B0738918-4ECE-45E3-AA19-AF151BD03470
 
 ###
 GET https://breaking.apns.iavian.net/push/ios/breaking?newsId=411265
